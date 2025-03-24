@@ -1,22 +1,21 @@
-
 import { ArrowDown } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { useNavigate } from "react-router-dom";
 import { useLanguage } from "@/contexts/LanguageContext";
-
 const LandingSection = () => {
   const navigate = useNavigate();
-  const { t } = useLanguage();
-  
+  const {
+    t
+  } = useLanguage();
   const scrollToFeatures = () => {
     const featuresSection = document.getElementById('features');
     if (featuresSection) {
-      featuresSection.scrollIntoView({ behavior: 'smooth' });
+      featuresSection.scrollIntoView({
+        behavior: 'smooth'
+      });
     }
   };
-
-  return (
-    <section className="min-h-screen flex flex-col justify-center items-center px-4 relative overflow-hidden pt-16">
+  return <section className="min-h-screen flex flex-col justify-center items-center px-4 relative overflow-hidden pt-16">
       {/* Background decoration */}
       <div className="absolute top-0 left-0 w-full h-full -z-10 overflow-hidden">
         <div className="absolute top-0 right-0 w-[80%] h-[80%] bg-primary/5 rounded-full blur-3xl -translate-y-1/2 translate-x-1/3"></div>
@@ -29,10 +28,7 @@ const LandingSection = () => {
         </div>
         
         <h1 className="h1 mb-6 text-balance max-w-4xl">
-          {t(
-            "A ", 
-            "एक "
-          )}
+          {t("A ", "एक ")}
           <span className="text-primary">
             {t("secure", "सुरक्षित")}
           </span>, 
@@ -47,37 +43,22 @@ const LandingSection = () => {
         </h1>
         
         <p className="p-large text-muted-foreground mb-8 max-w-2xl">
-          {t(
-            "Transforming democracy with cutting-edge blockchain technology, ensuring secure, transparent, and verifiable elections for all citizens.",
-            "अत्याधुनिक ब्लॉकचेन तकनीक के साथ लोकतंत्र को बदलते हुए, जो सभी नागरिकों के लिए सुरक्षित, पारदर्शी और सत्यापन योग्य चुनाव सुनिश्चित करता है।"
-          )}
+          {t("Transforming democracy with cutting-edge blockchain technology, ensuring secure, transparent, and verifiable elections for all citizens.", "अत्याधुनिक ब्लॉकचेन तकनीक के साथ लोकतंत्र को बदलते हुए, जो सभी नागरिकों के लिए सुरक्षित, पारदर्शी और सत्यापन योग्य चुनाव सुनिश्चित करता है।")}
         </p>
         
         <div className="flex flex-col sm:flex-row gap-4 mb-16">
-          <Button 
-            onClick={() => navigate("/auth")}
-            className="px-6 py-3 bg-primary text-white rounded-full font-medium shadow-lg shadow-primary/20 hover:shadow-xl hover:shadow-primary/30 transition-all hover:-translate-y-0.5"
-          >
+          <Button onClick={() => navigate("/auth")} className="px-6 py-3 bg-primary text-white rounded-full font-medium shadow-lg shadow-primary/20 hover:shadow-xl hover:shadow-primary/30 transition-all hover:-translate-y-0.5">
             {t("Vote Now", "अभी वोट करें")}
           </Button>
-          <Button 
-            onClick={() => scrollToFeatures()}
-            className="px-6 py-3 bg-white border border-border rounded-full font-medium hover:bg-secondary transition-colors"
-          >
+          <Button onClick={() => scrollToFeatures()} className="px-6 py-3 border border-border rounded-full font-medium transition-colors bg-zinc-950 hover:bg-zinc-800">
             {t("Learn More", "अधिक जानें")}
           </Button>
         </div>
         
-        <button 
-          onClick={scrollToFeatures}
-          className="absolute bottom-8 flex items-center justify-center animate-bounce"
-          aria-label="Scroll to features"
-        >
+        <button onClick={scrollToFeatures} className="absolute bottom-8 flex items-center justify-center animate-bounce" aria-label="Scroll to features">
           <ArrowDown className="w-6 h-6 text-primary" />
         </button>
       </div>
-    </section>
-  );
+    </section>;
 };
-
 export default LandingSection;
