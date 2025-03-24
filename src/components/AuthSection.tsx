@@ -1,4 +1,3 @@
-
 import { useState, useEffect } from "react";
 import { useNavigate } from "react-router-dom";
 import { 
@@ -476,7 +475,7 @@ const AuthSection = () => {
       </div>
       
       {/* Add custom styles for the scan animation */}
-      <style jsx>{`
+      <style>{`
         @keyframes scanLine {
           0% { transform: translateY(-50px); opacity: 0; }
           50% { opacity: 1; }
