@@ -1,12 +1,14 @@
 
 import { useState, useEffect } from "react";
 import { Link, useLocation } from "react-router-dom";
-import { Menu, X } from "lucide-react";
+import { Menu, X, Shield } from "lucide-react";
+import { useAuth } from "@/contexts/AuthContext";
 
 const Navbar = () => {
   const [isScrolled, setIsScrolled] = useState(false);
   const [mobileMenuOpen, setMobileMenuOpen] = useState(false);
   const location = useLocation();
+  const { isAuthenticated, isAdmin, logout } = useAuth();
 
   useEffect(() => {
     const handleScroll = () => {
@@ -24,12 +26,31 @@ const Navbar = () => {
     setMobileMenuOpen(false);
   };
 
-  const navLinks = [
-    { name: "Home", path: "/" },
-    { name: "Authentication", path: "/auth" },
-    { name: "Vote", path: "/vote" },
-    { name: "Results", path: "/results" },
-  ];
+  const handleLogout = () => {
+    logout();
+  };
+
+  // Dynamic nav links based on authentication state
+  const getNavLinks = () => {
+    const links = [
+      { name: "Home", path: "/" },
+    ];
+    
+    if (!isAuthenticated) {
+      links.push({ name: "Authentication", path: "/auth" });
+    } else {
+      links.push({ name: "Vote", path: "/vote" });
+      
+      // Only show Results link for admin users
+      if (isAdmin) {
+        links.push({ name: "Results", path: "/results" });
+      }
+    }
+    
+    return links;
+  };
+
+  const navLinks = getNavLinks();
 
   const isActive = (path: string) => {
     return location.pathname === path;
@@ -67,9 +88,25 @@ const Navbar = () => {
                     : "text-foreground/80 hover:text-primary"
                 }`}
               >
-                {link.name}
+                {link.name === "Results" && isAdmin ? (
+                  <div className="flex items-center">
+                    <Shield className="w-3 h-3 mr-1" />
+                    {link.name}
+                  </div>
+                ) : (
+                  link.name
+                )}
               </Link>
             ))}
+            
+            {isAuthenticated && (
+              <button
+                onClick={handleLogout}
+                className="px-3 py-2 rounded-md text-sm font-medium text-foreground/80 hover:text-primary transition-colors"
+              >
+                Logout
+              </button>
+            )}
           </div>
 
           {/* Mobile menu button */}
@@ -111,9 +148,25 @@ const Navbar = () => {
                   : "text-foreground/80 hover:text-primary"
               }`}
             >
-              {link.name}
+              {link.name === "Results" && isAdmin ? (
+                <div className="flex items-center">
+                  <Shield className="w-4 h-4 mr-1" />
+                  {link.name}
+                </div>
+              ) : (
+                link.name
+              )}
             </Link>
           ))}
+          
+          {isAuthenticated && (
+            <button
+              onClick={handleLogout}
+              className="block w-full text-left px-3 py-2 rounded-md text-base font-medium text-foreground/80 hover:text-primary transition-colors"
+            >
+              Logout
+            </button>
+          )}
         </div>
       </div>
     </nav>
