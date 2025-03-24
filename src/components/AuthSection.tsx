@@ -44,7 +44,7 @@ const AuthSection = () => {
   const [passwordError, setPasswordError] = useState("");
   
   // Additional features
-  const [language, setLanguage] = useState<"english" | "spanish" | "french">("english");
+  const [language, setLanguage] = useState<"english" | "hindi">("english");
   const [isDarkMode, setIsDarkMode] = useState(false);
   const [audioAssistance, setAudioAssistance] = useState(false);
   const [recoveryMode, setRecoveryMode] = useState(false);
@@ -53,29 +53,29 @@ const AuthSection = () => {
   useEffect(() => {
     if (voterId && voterId.length > 0) {
       if (voterId.length < 6) {
-        setVoterIdError("Voter ID must be at least 6 characters");
+        setVoterIdError(language === "english" ? "Voter ID must be at least 6 characters" : "मतदाता आईडी कम से कम 6 अक्षर होनी चाहिए");
       } else if (!/^[A-Za-z0-9]+$/.test(voterId)) {
-        setVoterIdError("Voter ID must contain only letters and numbers");
+        setVoterIdError(language === "english" ? "Voter ID must contain only letters and numbers" : "मतदाता आईडी में केवल अक्षर और संख्याएं होनी चाहिए");
       } else {
         setVoterIdError("");
       }
     } else {
       setVoterIdError("");
     }
-  }, [voterId]);
+  }, [voterId, language]);
 
   // Validate password in real-time
   useEffect(() => {
     if (password && password.length > 0) {
       if (password.length < 8) {
-        setPasswordError("Password must be at least 8 characters");
+        setPasswordError(language === "english" ? "Password must be at least 8 characters" : "पासवर्ड कम से कम 8 अक्षर होना चाहिए");
       } else {
         setPasswordError("");
       }
     } else {
       setPasswordError("");
     }
-  }, [password]);
+  }, [password, language]);
 
   // Auto-format voter ID to uppercase
   const handleVoterIdChange = (e: React.ChangeEvent<HTMLInputElement>) => {
@@ -89,8 +89,8 @@ const AuthSection = () => {
     // Validate inputs
     if (voterIdError || (authMethod === "credentials" && passwordError)) {
       toast({
-        title: "Validation Error",
-        description: "Please check your input and try again",
+        title: language === "english" ? "Validation Error" : "मान्यता त्रुटि",
+        description: language === "english" ? "Please check your input and try again" : "कृपया अपना इनपुट जांचें और पुनः प्रयास करें",
         variant: "destructive",
       });
       return;
@@ -102,8 +102,8 @@ const AuthSection = () => {
     setTimeout(() => {
       setIsLoading(false);
       toast({
-        title: "Authentication Successful",
-        description: "Redirecting to voting interface...",
+        title: language === "english" ? "Authentication Successful" : "प्रमाणीकरण सफल",
+        description: language === "english" ? "Redirecting to voting interface..." : "वोटिंग इंटरफ़ेस पर रीडायरेक्ट कर रहा है...",
       });
       
       // Call the login function from context
@@ -116,8 +116,8 @@ const AuthSection = () => {
   const simulateBiometricScan = () => {
     if (voterId.length === 0) {
       toast({
-        title: "Voter ID Required",
-        description: "Please enter your Voter ID first",
+        title: language === "english" ? "Voter ID Required" : "मतदाता आईडी आवश्यक है",
+        description: language === "english" ? "Please enter your Voter ID first" : "कृपया पहले अपनी मतदाता आईडी दर्ज करें",
         variant: "destructive",
       });
       return;
@@ -133,8 +133,8 @@ const AuthSection = () => {
       if (isSuccess) {
         setBiometricStatus("success");
         toast({
-          title: "Biometric Verification Successful",
-          description: "Fingerprint matched",
+          title: language === "english" ? "Biometric Verification Successful" : "बायोमेट्रिक सत्यापन सफल",
+          description: language === "english" ? "Fingerprint matched" : "फिंगरप्रिंट मिलान सफल",
         });
         
         // Navigate after successful scan
@@ -147,8 +147,8 @@ const AuthSection = () => {
       } else {
         setBiometricStatus("error");
         toast({
-          title: "Biometric Verification Failed",
-          description: "Please try again or use credentials",
+          title: language === "english" ? "Biometric Verification Failed" : "बायोमेट्रिक सत्यापन विफल",
+          description: language === "english" ? "Please try again or use credentials" : "कृपया पुनः प्रयास करें या क्रेडेंशियल्स का उपयोग करें",
           variant: "destructive",
         });
       }
@@ -163,28 +163,34 @@ const AuthSection = () => {
   const toggleAudioAssistance = () => {
     setAudioAssistance(!audioAssistance);
     toast({
-      title: audioAssistance ? "Audio Assistance Disabled" : "Audio Assistance Enabled",
-      description: audioAssistance ? "Audio guidance is now off" : "Audio guidance is now on",
+      title: audioAssistance 
+        ? (language === "english" ? "Audio Assistance Disabled" : "ऑडियो सहायता अक्षम") 
+        : (language === "english" ? "Audio Assistance Enabled" : "ऑडियो सहायता सक्षम"),
+      description: audioAssistance 
+        ? (language === "english" ? "Audio guidance is now off" : "ऑडियो मार्गदर्शन अब बंद है") 
+        : (language === "english" ? "Audio guidance is now on" : "ऑडियो मार्गदर्शन अब चालू है"),
     });
   };
 
   const toggleLanguage = () => {
-    if (language === "english") setLanguage("spanish");
-    else if (language === "spanish") setLanguage("french");
-    else setLanguage("english");
+    setLanguage(language === "english" ? "hindi" : "english");
     
     toast({
-      title: "Language Changed",
-      description: `Language set to ${language === "english" ? "Spanish" : language === "spanish" ? "French" : "English"}`,
+      title: language === "english" ? "भाषा बदली गई" : "Language Changed",
+      description: language === "english" ? "भाषा हिंदी में सेट की गई" : "Language set to English",
     });
   };
 
   const handleRecovery = () => {
     setRecoveryMode(true);
     toast({
-      title: "Recovery Mode",
-      description: "Please contact an election official for assistance",
+      title: language === "english" ? "Recovery Mode" : "रिकवरी मोड",
+      description: language === "english" ? "Please contact an election official for assistance" : "सहायता के लिए कृपया किसी चुनाव अधिकारी से संपर्क करें",
     });
+  };
+
+  const getTranslatedText = (eng: string, hindi: string) => {
+    return language === "english" ? eng : hindi;
   };
 
   return (
@@ -192,14 +198,13 @@ const AuthSection = () => {
       <div className="max-w-md w-full mx-auto">
         <div className="text-center mb-8 animate-fade-in">
           <h2 className="h2 mb-2">
-            {language === "english" ? "Voter Authentication" : 
-             language === "spanish" ? "Autenticación de Votante" : 
-             "Authentification de l'électeur"}
+            {getTranslatedText("Voter Authentication", "मतदाता प्रमाणीकरण")}
           </h2>
           <p className="text-muted-foreground">
-            {language === "english" ? "Please verify your identity to access the voting system" : 
-             language === "spanish" ? "Verifique su identidad para acceder al sistema de votación" : 
-             "Veuillez vérifier votre identité pour accéder au système de vote"}
+            {getTranslatedText(
+              "Please verify your identity to access the voting system", 
+              "वोटिंग सिस्टम तक पहुंचने के लिए कृपया अपनी पहचान सत्यापित करें"
+            )}
           </p>
         </div>
 
@@ -209,7 +214,7 @@ const AuthSection = () => {
             variant="outline" 
             size="icon" 
             onClick={toggleLanguage} 
-            title="Change Language"
+            title={language === "english" ? "Switch to Hindi" : "अंग्रेजी में स्विच करें"}
             className="rounded-full w-8 h-8"
           >
             <Globe className="h-4 w-4" />
@@ -219,7 +224,10 @@ const AuthSection = () => {
             variant="outline" 
             size="icon" 
             onClick={toggleAudioAssistance} 
-            title={audioAssistance ? "Disable Audio Assistance" : "Enable Audio Assistance"}
+            title={audioAssistance 
+              ? getTranslatedText("Disable Audio Assistance", "ऑडियो सहायता अक्षम करें") 
+              : getTranslatedText("Enable Audio Assistance", "ऑडियो सहायता सक्षम करें")
+            }
             className={`rounded-full w-8 h-8 ${audioAssistance ? "bg-primary text-primary-foreground" : ""}`}
           >
             <Volume2 className="h-4 w-4" />
@@ -229,7 +237,10 @@ const AuthSection = () => {
             variant="outline" 
             size="icon" 
             onClick={toggleDarkMode} 
-            title={isDarkMode ? "Switch to Light Mode" : "Switch to Dark Mode"}
+            title={isDarkMode 
+              ? getTranslatedText("Switch to Light Mode", "लाइट मोड में स्विच करें") 
+              : getTranslatedText("Switch to Dark Mode", "डार्क मोड में स्विच करें")
+            }
             className="rounded-full w-8 h-8"
           >
             {isDarkMode ? <Sun className="h-4 w-4" /> : <Moon className="h-4 w-4" />}
@@ -243,8 +254,8 @@ const AuthSection = () => {
           className="w-full"
         >
           <TabsList className="grid grid-cols-2 mb-6">
-            <TabsTrigger value="voter">Voter Login</TabsTrigger>
-            <TabsTrigger value="admin">Admin Login</TabsTrigger>
+            <TabsTrigger value="voter">{getTranslatedText("Voter Login", "मतदाता लॉगिन")}</TabsTrigger>
+            <TabsTrigger value="admin">{getTranslatedText("Admin Login", "व्यवस्थापक लॉगिन")}</TabsTrigger>
           </TabsList>
           
           <TabsContent value="voter">
@@ -255,18 +266,14 @@ const AuthSection = () => {
                 variant={authMethod === "credentials" ? "default" : "outline"}
                 className="rounded-full px-4 py-2 text-sm font-medium"
               >
-                {language === "english" ? "Credentials" : 
-                 language === "spanish" ? "Credenciales" : 
-                 "Identifiants"}
+                {getTranslatedText("Credentials", "क्रेडेंशियल्स")}
               </Button>
               <Button
                 onClick={() => setAuthMethod("biometric")}
                 variant={authMethod === "biometric" ? "default" : "outline"}
                 className="rounded-full px-4 py-2 text-sm font-medium"
               >
-                {language === "english" ? "Biometric" : 
-                 language === "spanish" ? "Biométrico" : 
-                 "Biométrique"}
+                {getTranslatedText("Biometric", "बायोमेट्रिक")}
               </Button>
             </div>
 
@@ -274,9 +281,7 @@ const AuthSection = () => {
               {/* Voter ID input (required for both methods) */}
               <div className="space-y-2 mb-4">
                 <Label htmlFor="voterId" className="text-sm font-medium">
-                  {language === "english" ? "Voter ID" : 
-                   language === "spanish" ? "ID de Votante" : 
-                   "ID d'électeur"}
+                  {getTranslatedText("Voter ID", "मतदाता आईडी")}
                 </Label>
                 <Input
                   id="voterId"
@@ -286,11 +291,7 @@ const AuthSection = () => {
                   className={`w-full bg-background transition-all ${
                     voterIdError ? "border-destructive ring-destructive/50" : ""
                   }`}
-                  placeholder={
-                    language === "english" ? "Enter your voter ID" : 
-                    language === "spanish" ? "Ingrese su ID de votante" : 
-                    "Entrez votre ID d'électeur"
-                  }
+                  placeholder={getTranslatedText("Enter your voter ID", "अपनी मतदाता आईडी दर्ज करें")}
                   disabled={isLoading || biometricStatus === "scanning" || biometricStatus === "success"}
                   aria-invalid={!!voterIdError}
                   aria-describedby={voterIdError ? "voterId-error" : undefined}
@@ -305,9 +306,7 @@ const AuthSection = () => {
                 <form onSubmit={handleLogin} className="space-y-4">
                   <div className="space-y-2">
                     <Label htmlFor="password" className="text-sm font-medium">
-                      {language === "english" ? "Password" : 
-                       language === "spanish" ? "Contraseña" : 
-                       "Mot de passe"}
+                      {getTranslatedText("Password", "पासवर्ड")}
                     </Label>
                     <div className="relative">
                       <Input
@@ -318,11 +317,7 @@ const AuthSection = () => {
                         className={`w-full pr-10 ${
                           passwordError ? "border-destructive ring-destructive/50" : ""
                         }`}
-                        placeholder={
-                          language === "english" ? "Enter your password" : 
-                          language === "spanish" ? "Ingrese su contraseña" : 
-                          "Entrez votre mot de passe"
-                        }
+                        placeholder={getTranslatedText("Enter your password", "अपना पासवर्ड दर्ज करें")}
                         disabled={isLoading}
                         aria-invalid={!!passwordError}
                         aria-describedby={passwordError ? "password-error" : undefined}
@@ -354,14 +349,10 @@ const AuthSection = () => {
                     {isLoading ? (
                       <>
                         <Loader2 className="w-5 h-5 mr-2 animate-spin" />
-                        {language === "english" ? "Authenticating..." : 
-                         language === "spanish" ? "Autenticando..." : 
-                         "Authentification..."}
+                        {getTranslatedText("Authenticating...", "प्रमाणीकरण हो रहा है...")}
                       </>
                     ) : (
-                      language === "english" ? "Login" : 
-                      language === "spanish" ? "Iniciar sesión" : 
-                      "Connexion"
+                      getTranslatedText("Login", "लॉगिन")
                     )}
                   </Button>
                   
@@ -371,9 +362,7 @@ const AuthSection = () => {
                       onClick={handleRecovery}
                       className="text-sm text-primary hover:underline"
                     >
-                      {language === "english" ? "Forgot Voter ID?" : 
-                       language === "spanish" ? "¿Olvidó su ID de votante?" : 
-                       "ID d'électeur oublié?"}
+                      {getTranslatedText("Forgot Voter ID?", "मतदाता आईडी भूल गए?")}
                     </button>
                   </div>
                 </form>
@@ -391,9 +380,7 @@ const AuthSection = () => {
                       <div className="text-center">
                         <Fingerprint className="w-20 h-20 text-muted-foreground mx-auto" />
                         <p className="text-sm text-muted-foreground mt-2">
-                          {language === "english" ? "Place your finger" : 
-                           language === "spanish" ? "Coloque su dedo" : 
-                           "Placez votre doigt"}
+                          {getTranslatedText("Place your finger", "अपनी उंगली रखें")}
                         </p>
                       </div>
                     )}
@@ -419,42 +406,32 @@ const AuthSection = () => {
                       disabled={!voterId || !!voterIdError}
                       className="px-6 py-3 font-medium"
                     >
-                      {language === "english" ? "Scan Fingerprint" : 
-                       language === "spanish" ? "Escanear Huella" : 
-                       "Scanner l'empreinte"}
+                      {getTranslatedText("Scan Fingerprint", "फिंगरप्रिंट स्कैन करें")}
                     </Button>
                   )}
                   
                   {biometricStatus === "scanning" && (
                     <p className="text-center text-primary font-medium animate-pulse">
-                      {language === "english" ? "Scanning your fingerprint..." : 
-                       language === "spanish" ? "Escaneando su huella digital..." : 
-                       "Numérisation de votre empreinte digitale..."}
+                      {getTranslatedText("Scanning your fingerprint...", "आपका फिंगरप्रिंट स्कैन किया जा रहा है...")}
                     </p>
                   )}
                   
                   {biometricStatus === "success" && (
                     <p className="text-center text-green-500 font-medium">
-                      {language === "english" ? "Authentication successful!" : 
-                       language === "spanish" ? "¡Autenticación exitosa!" : 
-                       "Authentification réussie!"}
+                      {getTranslatedText("Authentication successful!", "प्रमाणीकरण सफल!")}
                     </p>
                   )}
                   
                   {biometricStatus === "error" && (
                     <>
                       <p className="text-center text-red-500 font-medium mb-4">
-                        {language === "english" ? "Authentication failed" : 
-                         language === "spanish" ? "Autenticación fallida" : 
-                         "Échec de l'authentification"}
+                        {getTranslatedText("Authentication failed", "प्रमाणीकरण विफल")}
                       </p>
                       <Button
                         onClick={simulateBiometricScan}
                         className="px-6 py-3 font-medium"
                       >
-                        {language === "english" ? "Try Again" : 
-                         language === "spanish" ? "Intentar de nuevo" : 
-                         "Réessayer"}
+                        {getTranslatedText("Try Again", "पुनः प्रयास करें")}
                       </Button>
                     </>
                   )}
@@ -464,11 +441,10 @@ const AuthSection = () => {
               {recoveryMode && (
                 <Alert className="mt-4 border-yellow-500">
                   <AlertDescription className="text-sm">
-                    {language === "english" ? 
-                      "Please contact an election official with your ID for assistance with account recovery." : 
-                    language === "spanish" ? 
-                      "Por favor, contacte a un oficial electoral con su identificación para recibir asistencia con la recuperación de la cuenta." : 
-                      "Veuillez contacter un responsable électoral avec votre pièce d'identité pour obtenir de l'aide concernant la récupération de compte."}
+                    {getTranslatedText(
+                      "Please contact an election official with your ID for assistance with account recovery.",
+                      "खाता पुनर्प्राप्ति के लिए सहायता के लिए कृपया अपने आईडी के साथ किसी चुनाव अधिकारी से संपर्क करें।"
+                    )}
                   </AlertDescription>
                 </Alert>
               )}
@@ -483,28 +459,29 @@ const AuthSection = () => {
         {/* Help information */}
         <div className="mt-6 text-center text-sm text-muted-foreground">
           <p>
-            {language === "english" ? 
-              "Need help? Contact the election helpdesk" : 
-            language === "spanish" ? 
-              "¿Necesita ayuda? Contacte al centro de ayuda electoral" : 
-              "Besoin d'aide ? Contactez le service d'assistance électorale"}
+            {getTranslatedText(
+              "Need help? Contact the election helpdesk",
+              "मदद चाहिए? चुनाव हेल्पडेस्क से संपर्क करें"
+            )}
           </p>
           <p className="mt-1">
-            <a href="tel:+1234567890" className="text-primary hover:underline">
-              +1 (234) 567-890
+            <a href="tel:+918888888888" className="text-primary hover:underline">
+              +91 8888 888 888
             </a>
           </p>
         </div>
       </div>
       
       {/* Add custom styles for the scan animation */}
-      <style>{`
+      <style>
+      {`
         @keyframes scanLine {
           0% { transform: translateY(-50px); opacity: 0; }
           50% { opacity: 1; }
           100% { transform: translateY(50px); opacity: 0; }
         }
-      `}</style>
+      `}
+      </style>
     </section>
   );
 };
