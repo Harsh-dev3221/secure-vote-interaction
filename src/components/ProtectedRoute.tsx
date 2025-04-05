@@ -28,7 +28,7 @@ const ProtectedRoute = ({ element, requiresAdmin = false }: ProtectedRouteProps)
       const events = ['mousedown', 'mousemove', 'keypress', 'scroll', 'touchstart'];
 
       const handleUserActivity = () => {
-
+        resetTimer();
       };
 
       // Add event listeners
