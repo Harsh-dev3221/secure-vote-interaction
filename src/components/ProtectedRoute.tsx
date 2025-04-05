@@ -14,7 +14,7 @@ const ProtectedRoute = ({ element, requiresAdmin = false }: ProtectedRouteProps)
   const { toast } = useToast();
   const [secondsLeft, setSecondsLeft] = useState(150); // 2.5 minutes in seconds
   const [lastActivity, setLastActivity] = useState(Date.now());
-  
+
   // Reset timer on user activity
   const resetTimer = () => {
     setLastActivity(Date.now());
@@ -26,23 +26,23 @@ const ProtectedRoute = ({ element, requiresAdmin = false }: ProtectedRouteProps)
     if (isAuthenticated) {
       // Track user activity
       const events = ['mousedown', 'mousemove', 'keypress', 'scroll', 'touchstart'];
-      
+
       const handleUserActivity = () => {
-        resetTimer();
+
       };
-      
+
       // Add event listeners
       events.forEach(event => {
         document.addEventListener(event, handleUserActivity);
       });
-      
+
       // Timer countdown
       const interval = setInterval(() => {
         const secondsIdle = Math.floor((Date.now() - lastActivity) / 1000);
         const timeLeft = 150 - secondsIdle;
-        
+
         setSecondsLeft(Math.max(0, timeLeft));
-        
+
         // Show warning when 30 seconds left
         if (timeLeft === 30) {
           toast({
@@ -51,7 +51,7 @@ const ProtectedRoute = ({ element, requiresAdmin = false }: ProtectedRouteProps)
             variant: "destructive",
           });
         }
-        
+
         // Logout when timer reaches 0
         if (timeLeft <= 0) {
           logout();
@@ -63,7 +63,7 @@ const ProtectedRoute = ({ element, requiresAdmin = false }: ProtectedRouteProps)
           clearInterval(interval);
         }
       }, 1000);
-      
+
       // Clean up
       return () => {
         events.forEach(event => {
@@ -73,15 +73,15 @@ const ProtectedRoute = ({ element, requiresAdmin = false }: ProtectedRouteProps)
       };
     }
   }, [isAuthenticated, lastActivity, logout, toast]);
-  
+
   if (!isAuthenticated) {
     return <Navigate to="/auth" replace />;
   }
-  
+
   if (requiresAdmin && !isAdmin) {
     return <Navigate to="/" replace />;
   }
-  
+
   return (
     <>
       {isAuthenticated && (
