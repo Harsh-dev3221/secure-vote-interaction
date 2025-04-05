@@ -1,12 +1,15 @@
 
-import { useState } from "react";
-import { Check, ChevronRight, Loader2, AlertCircle } from "lucide-react";
+import { useState, useEffect } from "react";
+import { Check, ChevronRight, Loader2, AlertCircle, RefreshCw } from "lucide-react";
 import { useNavigate } from "react-router-dom";
 import { useToast } from "@/hooks/use-toast";
 import { 
   isEthereumProviderAvailable, 
   connectWallet, 
-  submitVoteToBlockchain 
+  submitVoteToBlockchain,
+  getActiveBlockchain,
+  setActiveBlockchain,
+  getPendingVotes
 } from "@/services/blockchainService";
 
 // Mock candidates data
@@ -53,6 +56,15 @@ const VotingInterface = () => {
   const [walletConnected, setWalletConnected] = useState(false);
   const [blockchainError, setBlockchainError] = useState<string | null>(null);
   const [transactionHash, setTransactionHash] = useState<string | null>(null);
+  const [activeBlockchain, setActiveBlockchainState] = useState<"ethereum" | "polygon" | "hybrid_local">(getActiveBlockchain());
+  const [voteId, setVoteId] = useState<string | null>(null);
+  const [pendingVotesCount, setPendingVotesCount] = useState(0);
+
+  // Check for pending votes
+  useEffect(() => {
+    const pendingVotes = getPendingVotes();
+    setPendingVotesCount(pendingVotes.length);
+  }, []);
 
   const handleCandidateSelect = (candidateId: number) => {
     setSelectedCandidate(candidateId);
@@ -97,6 +109,22 @@ const VotingInterface = () => {
     }
   };
 
+  const handleBlockchainChange = (blockchain: "ethereum" | "polygon" | "hybrid_local") => {
+    if (blockchain === "hybrid_local") {
+      setActiveBlockchainState("hybrid_local");
+    } else {
+      setActiveBlockchain(blockchain);
+      setActiveBlockchainState(blockchain);
+    }
+    
+    toast({
+      title: `${blockchain.charAt(0).toUpperCase() + blockchain.slice(1)} Selected`,
+      description: blockchain === "hybrid_local" 
+        ? "Votes will be stored locally first and can be submitted to blockchain later." 
+        : `Votes will be submitted to ${blockchain} blockchain (lower fees than Ethereum).`
+    });
+  };
+
   const handleSubmitVote = async () => {
     if (!selectedCandidate) return;
     
@@ -104,17 +132,21 @@ const VotingInterface = () => {
       setIsSubmitting(true);
       setBlockchainError(null);
       
-      // If wallet is not connected, connect it first
-      if (!walletConnected && isEthereumProviderAvailable()) {
+      // If wallet is not connected and we're not in hybrid mode, connect it first
+      if (!walletConnected && isEthereumProviderAvailable() && activeBlockchain !== "hybrid_local") {
         await handleConnectWallet();
       }
       
-      // Submit vote to blockchain
+      // Submit vote using the current blockchain method
       const result = await submitVoteToBlockchain(selectedCandidate);
       
-      // Store transaction hash for reference
+      // Store transaction info
       if (result.transactionHash) {
         setTransactionHash(result.transactionHash);
+      }
+      
+      if (result.voteId) {
+        setVoteId(result.voteId);
       }
       
       setIsSubmitting(false);
@@ -122,7 +154,9 @@ const VotingInterface = () => {
       
       toast({
         title: "Vote Submitted Successfully",
-        description: "Your vote has been recorded on the blockchain.",
+        description: result.transactionHash 
+          ? "Your vote has been recorded on the blockchain." 
+          : "Your vote has been recorded locally and will be submitted to the blockchain later.",
       });
       
       // Redirect to results after successful vote
@@ -135,7 +169,7 @@ const VotingInterface = () => {
       
       toast({
         title: "Voting Failed",
-        description: "There was an error submitting your vote to the blockchain.",
+        description: "There was an error recording your vote.",
         variant: "destructive",
       });
     }
@@ -143,27 +177,26 @@ const VotingInterface = () => {
 
   // Fallback to simulation if blockchain is not available
   const handleSimulateVote = () => {
-    setIsSubmitting(true);
-    
-    // Simulate blockchain transaction
-    setTimeout(() => {
-      setIsSubmitting(false);
-      setIsSuccess(true);
-      
-      toast({
-        title: "Vote Simulated",
-        description: "This is a simulation - in production, your vote would be recorded on the blockchain.",
-      });
-      
-      // Redirect to results after successful vote
-      setTimeout(() => {
-        navigate("/results");
-      }, 2000);
-    }, 3000);
+    handleBlockchainChange("hybrid_local");
+    handleSubmitVote();
   };
 
   const selectedCandidateData = candidates.find(c => c.id === selectedCandidate);
   const hasEthereumProvider = isEthereumProviderAvailable();
+
+  // Determine the appropriate blockchain icon/indicator
+  const getBlockchainIcon = () => {
+    switch (activeBlockchain) {
+      case "ethereum":
+        return "ETH";
+      case "polygon":
+        return "MATIC";
+      case "hybrid_local":
+        return "LOCAL";
+      default:
+        return "";
+    }
+  };
 
   return (
     <section className="min-h-screen flex items-center justify-center px-4 py-16">
@@ -175,6 +208,20 @@ const VotingInterface = () => {
           </p>
         </div>
 
+        {pendingVotesCount > 0 && !isSuccess && (
+          <div className="bg-amber-50 border border-amber-200 rounded-lg p-3 mb-4 flex items-center gap-2">
+            <RefreshCw className="w-5 h-5 text-amber-500" />
+            <div>
+              <p className="text-sm font-medium text-amber-800">
+                {pendingVotesCount} pending vote{pendingVotesCount !== 1 ? 's' : ''} stored locally
+              </p>
+              <p className="text-xs text-amber-700">
+                These votes will be submitted to blockchain later
+              </p>
+            </div>
+          </div>
+        )}
+
         {isSuccess ? (
           <div className="bg-card rounded-2xl shadow-lg border border-border p-8 text-center animate-scale-in">
             <div className="w-20 h-20 mx-auto bg-green-100 rounded-full flex items-center justify-center mb-6">
@@ -182,14 +229,25 @@ const VotingInterface = () => {
             </div>
             <h3 className="text-2xl font-bold mb-2">Vote Submitted Successfully!</h3>
             <p className="text-muted-foreground mb-6">
-              Your vote has been securely recorded on the blockchain.
+              {transactionHash 
+                ? "Your vote has been securely recorded on the blockchain." 
+                : "Your vote has been securely recorded locally and will be submitted to the blockchain later."}
             </p>
+            
             {transactionHash && (
               <div className="mb-6 p-3 bg-secondary/50 rounded-lg overflow-hidden text-sm">
                 <p className="font-medium mb-1">Transaction Hash:</p>
                 <p className="font-mono break-all">{transactionHash}</p>
               </div>
             )}
+            
+            {voteId && !transactionHash && (
+              <div className="mb-6 p-3 bg-secondary/50 rounded-lg overflow-hidden text-sm">
+                <p className="font-medium mb-1">Local Vote ID:</p>
+                <p className="font-mono break-all">{voteId}</p>
+              </div>
+            )}
+            
             <button
               onClick={() => navigate("/results")}
               className="px-6 py-3 bg-primary text-white rounded-lg font-medium shadow hover:shadow-md transition-all"
@@ -232,15 +290,51 @@ const VotingInterface = () => {
               ))}
             </div>
 
-            <div className="mt-6 flex justify-end">
-              <button
-                onClick={handleContinue}
-                disabled={selectedCandidate === null}
-                className="px-6 py-3 bg-primary text-white rounded-lg font-medium shadow hover:shadow-md transition-all disabled:opacity-50 disabled:cursor-not-allowed flex items-center"
-              >
-                Continue
-                <ChevronRight className="ml-1 w-5 h-5" />
-              </button>
+            <div className="mt-6">
+              {/* Blockchain selector */}
+              <div className="flex space-x-2 mb-4">
+                <button
+                  onClick={() => handleBlockchainChange("polygon")}
+                  className={`flex-1 px-3 py-2 rounded-lg text-xs font-medium ${
+                    activeBlockchain === "polygon"
+                      ? "bg-purple-100 text-purple-700 border border-purple-300"
+                      : "bg-secondary text-muted-foreground"
+                  }`}
+                >
+                  Polygon (Low Fees)
+                </button>
+                <button
+                  onClick={() => handleBlockchainChange("ethereum")}
+                  className={`flex-1 px-3 py-2 rounded-lg text-xs font-medium ${
+                    activeBlockchain === "ethereum"
+                      ? "bg-blue-100 text-blue-700 border border-blue-300"
+                      : "bg-secondary text-muted-foreground"
+                  }`}
+                >
+                  Ethereum
+                </button>
+                <button
+                  onClick={() => handleBlockchainChange("hybrid_local")}
+                  className={`flex-1 px-3 py-2 rounded-lg text-xs font-medium ${
+                    activeBlockchain === "hybrid_local"
+                      ? "bg-green-100 text-green-700 border border-green-300"
+                      : "bg-secondary text-muted-foreground"
+                  }`}
+                >
+                  Hybrid (No Gas)
+                </button>
+              </div>
+              
+              <div className="flex justify-end">
+                <button
+                  onClick={handleContinue}
+                  disabled={selectedCandidate === null}
+                  className="px-6 py-3 bg-primary text-white rounded-lg font-medium shadow hover:shadow-md transition-all disabled:opacity-50 disabled:cursor-not-allowed flex items-center"
+                >
+                  Continue
+                  <ChevronRight className="ml-1 w-5 h-5" />
+                </button>
+              </div>
             </div>
           </div>
         ) : (
@@ -260,18 +354,37 @@ const VotingInterface = () => {
             )}
             
             {/* Blockchain status */}
-            {hasEthereumProvider ? (
-              <div className="flex items-center gap-2 justify-center mb-4 text-sm">
-                <div className={`w-3 h-3 rounded-full ${walletConnected ? 'bg-green-500' : 'bg-amber-500'}`}></div>
-                <span>{walletConnected ? 'Wallet Connected' : 'Wallet Ready'}</span>
+            <div className="bg-secondary/50 rounded-lg p-3 mb-4 flex items-center justify-between">
+              <div className="flex items-center gap-2">
+                <div className={`px-2 py-1 rounded text-xs font-bold ${
+                  activeBlockchain === "ethereum" ? "bg-blue-100 text-blue-700" :
+                  activeBlockchain === "polygon" ? "bg-purple-100 text-purple-700" :
+                  "bg-green-100 text-green-700"
+                }`}>
+                  {getBlockchainIcon()}
+                </div>
+                <span className="text-sm font-medium">
+                  {activeBlockchain === "ethereum" ? "Ethereum Network" :
+                   activeBlockchain === "polygon" ? "Polygon Network (Low Fees)" :
+                   "Hybrid - Store Locally First (No Gas)"}
+                </span>
               </div>
-            ) : (
+              
+              {activeBlockchain !== "hybrid_local" && (
+                <div className="flex items-center gap-1">
+                  <div className={`w-2 h-2 rounded-full ${walletConnected ? 'bg-green-500' : 'bg-amber-500'}`}></div>
+                  <span className="text-xs">{walletConnected ? 'Connected' : 'Not Connected'}</span>
+                </div>
+              )}
+            </div>
+            
+            {!hasEthereumProvider && activeBlockchain !== "hybrid_local" && (
               <div className="bg-amber-50 border border-amber-200 rounded-lg p-3 mb-4 flex items-start gap-2">
                 <AlertCircle className="w-5 h-5 text-amber-500 flex-shrink-0 mt-0.5" />
                 <div>
                   <p className="text-sm font-medium text-amber-800">No Ethereum wallet detected</p>
                   <p className="text-xs text-amber-700">
-                    MetaMask not found. Your vote will be simulated.
+                    MetaMask not found. Consider using Hybrid mode instead.
                   </p>
                 </div>
               </div>
@@ -299,17 +412,17 @@ const VotingInterface = () => {
                 Back
               </button>
               <button
-                onClick={hasEthereumProvider ? handleSubmitVote : handleSimulateVote}
+                onClick={handleSubmitVote}
                 disabled={isSubmitting}
                 className="flex-1 px-4 py-3 bg-primary text-white rounded-lg font-medium shadow hover:shadow-md transition-all disabled:opacity-70 flex items-center justify-center"
               >
                 {isSubmitting ? (
                   <>
                     <Loader2 className="w-5 h-5 mr-2 animate-spin" />
-                    {walletConnected ? 'Submitting...' : 'Connecting...'}
+                    {activeBlockchain !== "hybrid_local" && !walletConnected ? 'Connecting...' : 'Submitting...'}
                   </>
                 ) : (
-                  `${hasEthereumProvider ? 'Submit Vote' : 'Simulate Vote'}`
+                  `Submit Vote`
                 )}
               </button>
             </div>
@@ -319,7 +432,9 @@ const VotingInterface = () => {
         {/* Blockchain explainer */}
         <div className="mt-6 text-center">
           <p className="text-xs text-muted-foreground">
-            This voting system is secured by blockchain technology to ensure vote integrity and transparency.
+            {activeBlockchain === "hybrid_local" 
+              ? "This voting system uses a hybrid approach - votes are stored locally first and can be submitted to blockchain later for verification." 
+              : `This voting system is secured by ${activeBlockchain} blockchain technology to ensure vote integrity and transparency${activeBlockchain === "polygon" ? " with lower fees" : ""}.`}
           </p>
         </div>
       </div>
