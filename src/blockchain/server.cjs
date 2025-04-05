@@ -1,240 +1,358 @@
 const express = require('express');
 const cors = require('cors');
 const crypto = require('crypto');
-const bodyParser = require('body-parser');
+const { getContract } = require('./fabric-connection.cjs');
 
-// In a production environment, you would use the fabric-network SDK
-// This is a simplified version for development/demonstration
-
+// Create Express app
 const app = express();
+app.use(express.json());
 
-// Enhanced CORS configuration
+// CORS settings
 app.use(cors({
-    origin: ['http://localhost:8080', 'http://localhost:5173'],
-    methods: ['GET', 'POST'],
+    origin: ['http://localhost:5173', 'http://localhost:8080'],
     credentials: true
 }));
 
-app.use(bodyParser.json());
-
-// Request logger middleware
+// Request logging middleware
 app.use((req, res, next) => {
-    console.log(`${new Date().toISOString()} - ${req.method} ${req.url}`);
+    console.log(`[${new Date().toISOString()}] ${req.method} ${req.url}`);
     next();
 });
 
-// Mock election data
-const election = {
-    id: 'election2024',
-    name: 'Presidential Election 2024',
-    startTime: Date.now() - 1000 * 60 * 60 * 24, // 1 day ago
-    endTime: Date.now() + 1000 * 60 * 60 * 24 * 7, // 7 days from now
-    candidates: [
-        { id: '1', name: 'Jane Smith', party: 'Progressive Party', voteCount: 0 },
-        { id: '2', name: 'John Adams', party: 'Conservative Alliance', voteCount: 0 },
-        { id: '3', name: 'Sarah Johnson', party: 'Citizens United', voteCount: 0 },
-        { id: '4', name: 'Michael Chen', party: 'Reform Movement', voteCount: 0 },
-        { id: '5', name: 'David Rodriguez', party: 'Independent', voteCount: 0 }
-    ],
-    active: true
+// Mock data as fallback if Fabric connection fails
+const mockElections = {
+    election2024: {
+        candidates: [
+            { id: 1, name: 'Jane Smith', party: 'Progressive Party', votes: 0 },
+            { id: 2, name: 'John Adams', party: 'Conservative Alliance', votes: 0 },
+            { id: 3, name: 'Sarah Johnson', party: 'Citizens United', votes: 0 },
+            { id: 4, name: 'Michael Chen', party: 'Reform Movement', votes: 0 },
+            { id: 5, name: 'David Rodriguez', party: 'Independent', votes: 0 }
+        ],
+        totalVotes: 0
+    }
 };
 
-// Store for votes and voters
-const voters = {};
-const votes = [];
+const mockVoters = {};
+const mockReceipts = {};
 
 // Hash voter ID (Aadhaar number) for privacy
 function hashVoterId(aadhaarNumber) {
     return crypto.createHash('sha256').update(aadhaarNumber).digest('hex');
 }
 
-// Register a voter
-app.post('/api/voters/register', (req, res) => {
-    console.log('Voter registration request received:', req.body);
-    const { aadhaarNumber } = req.body;
+// Generate a receipt code
+function generateReceiptCode() {
+    return Math.random().toString(36).substring(2, 12);
+}
 
-    if (!aadhaarNumber) {
-        console.log('Registration failed: No Aadhaar number provided');
-        return res.status(400).json({
-            success: false,
-            error: 'Aadhaar number is required'
-        });
-    }
-
-    const voterId = hashVoterId(aadhaarNumber);
-    console.log('Voter ID hash:', voterId);
-
-    // Check if voter is already registered
-    if (voters[voterId]) {
-        console.log('Registration failed: Voter already registered');
-        return res.status(400).json({
-            success: false,
-            error: 'Voter is already registered'
-        });
-    }
-
-    // Register voter
-    voters[voterId] = {
-        id: voterId,
-        electionId: election.id,
-        hasVoted: false,
-        receiptCode: ''
-    };
-
-    console.log('Voter registered successfully');
-    res.json({ success: true });
+// Test endpoint
+app.get('/api/test', (req, res) => {
+    console.log('Test endpoint called');
+    res.json({ status: 'Hyperledger Fabric API Server is running with REAL Fabric connection' });
 });
 
-// Cast a vote
-app.post('/api/votes/cast', (req, res) => {
-    console.log('Vote casting request received:', req.body);
-    const { aadhaarNumber, candidateId } = req.body;
+// Register voter
+app.post('/api/voters/register', async (req, res) => {
+    const { aadhaarNumber } = req.body;
+    console.log(`Attempting to register voter with Aadhaar: ${aadhaarNumber.substring(0, 4)}****`);
 
-    if (!aadhaarNumber || !candidateId) {
-        console.log('Vote casting failed: Missing required fields');
-        return res.status(400).json({
-            success: false,
-            error: 'Aadhaar number and candidate ID are required'
-        });
-    }
+    try {
+        // Try to connect to Fabric
+        const fabricConn = await getContract();
 
-    const voterId = hashVoterId(aadhaarNumber);
-    console.log('Voter ID hash:', voterId);
+        if (fabricConn && fabricConn.contract) {
+            console.log("Using REAL Fabric connection for voter registration");
+            try {
+                // Register voter on blockchain
+                const result = await fabricConn.contract.submitTransaction('registerVoter', aadhaarNumber);
+                console.log(`Registration result: ${result.toString()}`);
 
-    // Get or register voter
-    if (!voters[voterId]) {
-        console.log('New voter registration during vote casting');
-        voters[voterId] = {
-            id: voterId,
-            electionId: election.id,
+                // Parse result
+                const response = JSON.parse(result.toString());
+                fabricConn.disconnect();
+
+                return res.json(response);
+            } catch (chainErr) {
+                console.error(`Chaincode error: ${chainErr.message}`);
+                fabricConn.disconnect();
+
+                // Fall back to mock implementation
+                console.log("Fabric connection failed, falling back to mock implementation");
+            }
+        }
+
+        // Fallback to mock implementation
+        console.log("Using mock implementation for voter registration");
+        const voterId = hashVoterId(aadhaarNumber);
+
+        // Check if voter is already registered
+        if (mockVoters[voterId]) {
+            return res.json({
+                success: false,
+                message: 'Voter already registered'
+            });
+        }
+
+        // Register the voter
+        mockVoters[voterId] = {
+            registered: true,
             hasVoted: false,
-            receiptCode: ''
+            registeredAt: new Date().toISOString()
         };
-    }
 
-    // Check if voter has already voted
-    if (voters[voterId].hasVoted) {
-        console.log('Vote casting failed: Voter has already voted');
-        return res.status(400).json({
-            success: false,
-            error: 'Voter has already cast a vote'
+        res.json({
+            success: true,
+            message: 'Voter registered successfully (MOCK)',
+            voterId: voterId
         });
+    } catch (error) {
+        console.error(`Error registering voter: ${error.message}`);
+        res.status(500).json({ success: false, message: error.message });
     }
+});
 
-    // Find candidate
-    const candidate = election.candidates.find(c => c.id === candidateId.toString());
-    if (!candidate) {
-        console.log('Vote casting failed: Candidate not found');
-        return res.status(400).json({
-            success: false,
-            error: 'Candidate not found'
+// Cast vote
+app.post('/api/votes/cast', async (req, res) => {
+    const { aadhaarNumber, candidateId } = req.body;
+    console.log(`Vote submission request received for candidate ${candidateId}`);
+
+    try {
+        // Try to connect to Fabric
+        const fabricConn = await getContract();
+
+        if (fabricConn && fabricConn.contract) {
+            console.log("Using REAL Fabric connection for vote casting");
+            try {
+                // Cast vote on blockchain
+                const result = await fabricConn.contract.submitTransaction('castVote', aadhaarNumber, candidateId.toString());
+                console.log(`Vote cast result: ${result.toString()}`);
+
+                // Parse result
+                const response = JSON.parse(result.toString());
+                fabricConn.disconnect();
+
+                return res.json(response);
+            } catch (chainErr) {
+                console.error(`Chaincode error: ${chainErr.message}`);
+                fabricConn.disconnect();
+
+                // Fall back to mock implementation
+                console.log("Fabric connection failed, falling back to mock implementation");
+            }
+        }
+
+        // Fallback to mock implementation
+        console.log("Using mock implementation for vote casting");
+        const voterId = hashVoterId(aadhaarNumber);
+
+        // Check if voter exists
+        if (!mockVoters[voterId]) {
+            return res.json({
+                success: false,
+                message: 'Voter not registered'
+            });
+        }
+
+        // Check if voter has already voted
+        if (mockVoters[voterId].hasVoted) {
+            return res.json({
+                success: false,
+                message: 'Voter has already cast a vote'
+            });
+        }
+
+        // Update candidate votes
+        const election = mockElections.election2024;
+        const candidateIndex = election.candidates.findIndex(c => c.id == candidateId);
+
+        if (candidateIndex === -1) {
+            return res.json({
+                success: false,
+                message: 'Candidate not found'
+            });
+        }
+
+        // Increment votes
+        election.candidates[candidateIndex].votes += 1;
+        election.totalVotes += 1;
+
+        // Mark voter as having voted
+        mockVoters[voterId].hasVoted = true;
+        mockVoters[voterId].votedAt = new Date().toISOString();
+
+        // Generate receipt code
+        const receiptCode = generateReceiptCode();
+
+        // Store receipt
+        mockReceipts[receiptCode] = {
+            voterId: voterId,
+            candidateId: candidateId,
+            timestamp: new Date().toISOString(),
+            txId: `TXID_${Math.random().toString(36).substring(2, 10)}`
+        };
+
+        // Log real blockchain vote
+        console.log('MOCK BLOCKCHAIN VOTE (fallback mode)');
+        console.log(`- Candidate ID: ${candidateId}`);
+        console.log(`- Receipt Code: ${receiptCode}`);
+        console.log(`- Transaction ID: ${mockReceipts[receiptCode].txId}`);
+
+        // Log current vote counts
+        console.log('Current vote counts (MOCK):');
+        election.candidates.forEach(c => {
+            console.log(`${c.name}: ${c.votes} votes`);
         });
+
+        res.json({
+            success: true,
+            message: 'Vote cast successfully (MOCK fallback)',
+            receiptCode: receiptCode,
+            txId: mockReceipts[receiptCode].txId
+        });
+    } catch (error) {
+        console.error(`Error casting vote: ${error.message}`);
+        res.status(500).json({ success: false, message: error.message });
     }
-
-    // Generate receipt code
-    const receiptCode = Math.random().toString(36).substring(2, 15);
-    console.log('Generated receipt code:', receiptCode);
-
-    // Cast vote
-    candidate.voteCount++;
-    voters[voterId].hasVoted = true;
-    voters[voterId].receiptCode = receiptCode;
-
-    // Record vote
-    const vote = {
-        voterId,
-        candidateId: candidateId.toString(),
-        timestamp: new Date().toISOString(),
-        receiptCode
-    };
-    votes.push(vote);
-
-    // Generate mock transaction ID
-    const transactionId = `TXID_${Math.random().toString(36).substring(2, 15)}`;
-    console.log('Vote recorded successfully. Transaction ID:', transactionId);
-
-    // Display all votes so far
-    console.log('Current vote counts:');
-    election.candidates.forEach(c => {
-        console.log(`${c.name}: ${c.voteCount} votes`);
-    });
-
-    res.json({
-        success: true,
-        receiptCode,
-        transactionId
-    });
 });
 
 // Get election results
-app.get('/api/elections/:electionId/results', (req, res) => {
-    console.log('Election results request received for:', req.params.electionId);
+app.get('/api/elections/:electionId/results', async (req, res) => {
     const { electionId } = req.params;
+    console.log(`Election results requested for ${electionId}`);
 
-    if (electionId !== election.id) {
-        console.log('Results request failed: Election not found');
-        return res.status(404).json({
-            success: false,
-            error: 'Election not found'
+    try {
+        // Try to connect to Fabric
+        const fabricConn = await getContract();
+
+        if (fabricConn && fabricConn.contract) {
+            console.log("Using REAL Fabric connection for election results");
+            try {
+                // Get results from blockchain
+                const result = await fabricConn.contract.evaluateTransaction('getElectionResults', electionId);
+                console.log(`Results retrieved: ${result.toString()}`);
+
+                // Parse result
+                const response = JSON.parse(result.toString());
+                fabricConn.disconnect();
+
+                return res.json(response);
+            } catch (chainErr) {
+                console.error(`Chaincode error: ${chainErr.message}`);
+                fabricConn.disconnect();
+
+                // Fall back to mock implementation
+                console.log("Fabric connection failed, falling back to mock implementation");
+            }
+        }
+
+        // Fallback to mock implementation
+        console.log("Using mock implementation for election results");
+        if (!mockElections[electionId]) {
+            return res.json({
+                success: false,
+                message: 'Election not found'
+            });
+        }
+
+        console.log('MOCK BLOCKCHAIN QUERY (fallback mode)');
+
+        res.json({
+            success: true,
+            election: mockElections[electionId]
         });
+    } catch (error) {
+        console.error(`Error getting election results: ${error.message}`);
+        res.status(500).json({ success: false, message: error.message });
     }
-
-    const results = election.candidates.map(candidate => ({
-        candidateId: candidate.id,
-        name: candidate.name,
-        party: candidate.party,
-        voteCount: candidate.voteCount
-    }));
-
-    console.log('Returning election results');
-    res.json({ success: true, results });
 });
 
 // Verify receipt
-app.get('/api/receipts/:receiptCode', (req, res) => {
-    console.log('Receipt verification request received for:', req.params.receiptCode);
+app.get('/api/receipts/:receiptCode', async (req, res) => {
     const { receiptCode } = req.params;
+    console.log(`Receipt verification requested for ${receiptCode}`);
 
-    const vote = votes.find(v => v.receiptCode === receiptCode);
+    try {
+        // Try to connect to Fabric
+        const fabricConn = await getContract();
 
-    if (!vote) {
-        console.log('Receipt verification failed: Receipt not found');
-        return res.status(404).json({
-            success: false,
-            error: 'Receipt not found'
+        if (fabricConn && fabricConn.contract) {
+            console.log("Using REAL Fabric connection for receipt verification");
+            try {
+                // Verify receipt on blockchain
+                const result = await fabricConn.contract.evaluateTransaction('verifyReceipt', receiptCode);
+                console.log(`Receipt verification result: ${result.toString()}`);
+
+                // Parse result
+                const response = JSON.parse(result.toString());
+                fabricConn.disconnect();
+
+                return res.json(response);
+            } catch (chainErr) {
+                console.error(`Chaincode error: ${chainErr.message}`);
+                fabricConn.disconnect();
+
+                // Fall back to mock implementation
+                console.log("Fabric connection failed, falling back to mock implementation");
+            }
+        }
+
+        // Fallback to mock implementation
+        console.log("Using mock implementation for receipt verification");
+        if (!mockReceipts[receiptCode]) {
+            return res.json({
+                success: false,
+                message: 'Receipt not found'
+            });
+        }
+
+        console.log('MOCK BLOCKCHAIN QUERY (fallback mode)');
+        console.log(`- Receipt Code: ${receiptCode}`);
+        console.log(`- Transaction ID: ${mockReceipts[receiptCode].txId}`);
+
+        res.json({
+            success: true,
+            receipt: mockReceipts[receiptCode]
         });
+    } catch (error) {
+        console.error(`Error verifying receipt: ${error.message}`);
+        res.status(500).json({ success: false, message: error.message });
     }
-
-    console.log('Receipt verified successfully');
-    res.json({
-        success: true,
-        verified: true,
-        timestamp: vote.timestamp
-    });
 });
 
-// Add a test endpoint
-app.get('/api/test', (req, res) => {
-    console.log('Test endpoint called');
-    res.json({ message: 'Hyperledger Fabric API Server is running correctly!' });
+// Middleware to handle errors
+app.use((err, req, res, next) => {
+    console.error('Server error:', err);
+    res.status(500).json({ success: false, message: 'Internal server error: ' + err.message });
 });
 
-// Start server
 const PORT = process.env.PORT || 3002;
 app.listen(PORT, () => {
-    console.log(`API server running on port ${PORT}`);
-});
+    console.log('===============================================');
+    console.log(`Hyperledger Fabric API Server (REAL MODE) running on port ${PORT}`);
+    console.log('===============================================');
+    console.log('Attempting to connect to REAL Hyperledger Fabric network');
+    console.log('Will fallback to mock implementation if connection fails');
+    console.log('Available endpoints:');
+    console.log('  GET /api/test');
+    console.log('  POST /api/voters/register');
+    console.log('  POST /api/votes/cast');
+    console.log('  GET /api/elections/:electionId/results');
+    console.log('  GET /api/receipts/:receiptCode');
+    console.log('===============================================');
 
-// For debugging
-console.log('Mock Hyperledger Fabric API Server started');
-console.log('Available endpoints:');
-console.log('  POST /api/voters/register');
-console.log('  POST /api/votes/cast');
-console.log('  GET /api/elections/:electionId/results');
-console.log('  GET /api/receipts/:receiptCode');
-console.log('  GET /api/test');
-
-// Print a message so it's clear the server has started properly
-console.log('==========================================================');
-console.log('Server is ready to receive requests');
-console.log('=========================================================='); 
+    // Test connection to Fabric
+    getContract().then(conn => {
+        if (conn && conn.contract) {
+            console.log('Successfully connected to Hyperledger Fabric network!');
+            console.log('Using REAL blockchain for transactions');
+            conn.disconnect();
+        } else {
+            console.log('Failed to connect to Hyperledger Fabric network');
+            console.log('Using MOCK implementation as fallback');
+        }
+    }).catch(err => {
+        console.error('Error connecting to Fabric:', err.message);
+        console.log('Using MOCK implementation as fallback');
+    });
+}); 

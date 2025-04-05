@@ -1,25 +1,110 @@
-# Hyperledger Fabric Integration for Secure Voting
+# Hyperledger Fabric Integration for Secure Vote Interaction
 
-This directory contains the implementation of a Hyperledger Fabric blockchain network for the secure voting application.
+This directory contains all the necessary files to integrate the Secure Vote Interaction app with Hyperledger Fabric.
 
-## Structure
+## Current Status: Mock Mode
 
-- `chaincode/` - Contains the smart contract (chaincode) implementation
-- `config/` - Configuration files for the Hyperledger Fabric network
-- `scripts/` - Helper scripts for starting and managing the network
-- `server.js` - A simple Express server that simulates the Fabric API
+The application currently runs in "Mock Mode," which means it simulates blockchain operations without requiring an actual Hyperledger Fabric network. This allows for development and testing of the application logic while Fabric infrastructure is being set up.
 
-## Development
+All API endpoints are functional and provide realistic responses, but data is stored in-memory rather than in a blockchain.
 
-To start the development environment:
+### Running the Mock Server
 
 ```bash
-# Start the development server
+# Start the API server in mock mode
 npm run fabric:dev
-
-# Start both React app and Fabric server
-npm run dev:all
 ```
+
+### Testing the Mock Server
+
+```bash
+npm run fabric:test
+```
+
+## Setting Up Real Hyperledger Fabric (Future Steps)
+
+### Prerequisites
+- Docker Desktop installed and running
+- Node.js v14+ and npm
+- Hyperledger Fabric binaries and docker images
+
+### Step 1: Install Fabric Prerequisites
+```bash
+# Navigate to the blockchain directory
+cd src/blockchain
+
+# Install required npm packages
+npm install fabric-network fabric-ca-client
+```
+
+### Step 2: Start the Fabric Test Network
+To start a Hyperledger Fabric test network, you need to:
+
+1. Download the Fabric samples:
+```bash
+curl -sSL https://bit.ly/2ysbOFE | bash -s -- 2.2.2 1.5.2
+```
+
+2. Navigate to the test-network directory:
+```bash
+cd fabric-samples/test-network
+```
+
+3. Start the network and create a channel:
+```bash
+./network.sh up createChannel -c votingchannel
+```
+
+4. Deploy the chaincode:
+```bash
+./network.sh deployCC -ccn voting -ccp /path/to/voting-chaincode -ccl javascript
+```
+
+### Step 3: Set Up Fabric Identities
+```bash
+# Enroll admin user
+npm run fabric:enroll-admin
+
+# Register application user
+npm run fabric:register-user
+```
+
+### Step 4: Start the API Server
+```bash
+# Start the API server
+npm run fabric:dev
+```
+
+## Testing
+You can test if the Fabric API server is working correctly by running:
+```bash
+npm run fabric:test
+```
+
+## API Endpoints
+
+| Endpoint | Method | Description |
+|----------|--------|-------------|
+| `/api/test` | GET | Check if the server is running |
+| `/api/voters/register` | POST | Register a voter with their Aadhaar number |
+| `/api/votes/cast` | POST | Cast a vote for a specific candidate |
+| `/api/elections/:electionId/results` | GET | Get the current election results |
+| `/api/receipts/:receiptCode` | GET | Verify a vote receipt |
+
+## Troubleshooting
+
+1. **"Failed to connect to Fabric network"**
+   - Ensure the test network is running
+   - Check if the wallet contains the required identities
+   - Verify the connection profile is correctly configured
+
+2. **"No identity found"**
+   - Run the enrollAdmin.js and registerUser.js scripts to create the necessary identities
+
+3. **Docker issues**
+   - Try restarting Docker Desktop
+   - Clear Docker containers with `docker rm -f $(docker ps -aq)`
+   - Clear Docker volumes with `docker volume prune`
 
 ## Features
 
@@ -28,13 +113,6 @@ npm run dev:all
 3. **Vote Privacy**: Votes are recorded with privacy in mind
 4. **Receipt Verification**: Each vote generates a verifiable receipt
 5. **Auditable**: Results can be audited by authorized parties
-
-## API Endpoints
-
-- **POST /api/voters/register** - Register a voter by Aadhaar number
-- **POST /api/votes/cast** - Cast a vote
-- **GET /api/elections/:electionId/results** - Get election results
-- **GET /api/receipts/:receiptCode** - Verify a vote receipt
 
 ## Production Deployment
 
