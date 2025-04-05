@@ -1,7 +1,13 @@
 
 import { useState } from "react";
-import { Check, ChevronRight, Loader2 } from "lucide-react";
+import { Check, ChevronRight, Loader2, AlertCircle } from "lucide-react";
 import { useNavigate } from "react-router-dom";
+import { useToast } from "@/hooks/use-toast";
+import { 
+  isEthereumProviderAvailable, 
+  connectWallet, 
+  submitVoteToBlockchain 
+} from "@/services/blockchainService";
 
 // Mock candidates data
 const candidates = [
@@ -39,10 +45,14 @@ const candidates = [
 
 const VotingInterface = () => {
   const navigate = useNavigate();
+  const { toast } = useToast();
   const [selectedCandidate, setSelectedCandidate] = useState<number | null>(null);
   const [confirmationStep, setConfirmationStep] = useState(false);
   const [isSubmitting, setIsSubmitting] = useState(false);
   const [isSuccess, setIsSuccess] = useState(false);
+  const [walletConnected, setWalletConnected] = useState(false);
+  const [blockchainError, setBlockchainError] = useState<string | null>(null);
+  const [transactionHash, setTransactionHash] = useState<string | null>(null);
 
   const handleCandidateSelect = (candidateId: number) => {
     setSelectedCandidate(candidateId);
@@ -54,15 +64,96 @@ const VotingInterface = () => {
 
   const handleBack = () => {
     setConfirmationStep(false);
+    setBlockchainError(null);
   };
 
-  const handleSubmitVote = () => {
+  const handleConnectWallet = async () => {
+    if (!isEthereumProviderAvailable()) {
+      toast({
+        title: "Wallet Not Found",
+        description: "Please install MetaMask or another Ethereum wallet to continue.",
+        variant: "destructive",
+      });
+      return;
+    }
+
+    try {
+      setIsSubmitting(true);
+      const account = await connectWallet();
+      setWalletConnected(true);
+      toast({
+        title: "Wallet Connected",
+        description: `Connected with account ${account.substring(0, 6)}...${account.substring(38)}`,
+      });
+    } catch (error) {
+      console.error("Wallet connection error:", error);
+      toast({
+        title: "Connection Failed",
+        description: "Failed to connect to your Ethereum wallet.",
+        variant: "destructive",
+      });
+    } finally {
+      setIsSubmitting(false);
+    }
+  };
+
+  const handleSubmitVote = async () => {
+    if (!selectedCandidate) return;
+    
+    try {
+      setIsSubmitting(true);
+      setBlockchainError(null);
+      
+      // If wallet is not connected, connect it first
+      if (!walletConnected && isEthereumProviderAvailable()) {
+        await handleConnectWallet();
+      }
+      
+      // Submit vote to blockchain
+      const result = await submitVoteToBlockchain(selectedCandidate);
+      
+      // Store transaction hash for reference
+      if (result.transactionHash) {
+        setTransactionHash(result.transactionHash);
+      }
+      
+      setIsSubmitting(false);
+      setIsSuccess(true);
+      
+      toast({
+        title: "Vote Submitted Successfully",
+        description: "Your vote has been recorded on the blockchain.",
+      });
+      
+      // Redirect to results after successful vote
+      setTimeout(() => {
+        navigate("/results");
+      }, 2000);
+    } catch (error: any) {
+      setIsSubmitting(false);
+      setBlockchainError(error.message || "Failed to submit vote to blockchain");
+      
+      toast({
+        title: "Voting Failed",
+        description: "There was an error submitting your vote to the blockchain.",
+        variant: "destructive",
+      });
+    }
+  };
+
+  // Fallback to simulation if blockchain is not available
+  const handleSimulateVote = () => {
     setIsSubmitting(true);
     
     // Simulate blockchain transaction
     setTimeout(() => {
       setIsSubmitting(false);
       setIsSuccess(true);
+      
+      toast({
+        title: "Vote Simulated",
+        description: "This is a simulation - in production, your vote would be recorded on the blockchain.",
+      });
       
       // Redirect to results after successful vote
       setTimeout(() => {
@@ -72,6 +163,7 @@ const VotingInterface = () => {
   };
 
   const selectedCandidateData = candidates.find(c => c.id === selectedCandidate);
+  const hasEthereumProvider = isEthereumProviderAvailable();
 
   return (
     <section className="min-h-screen flex items-center justify-center px-4 py-16">
@@ -92,6 +184,12 @@ const VotingInterface = () => {
             <p className="text-muted-foreground mb-6">
               Your vote has been securely recorded on the blockchain.
             </p>
+            {transactionHash && (
+              <div className="mb-6 p-3 bg-secondary/50 rounded-lg overflow-hidden text-sm">
+                <p className="font-medium mb-1">Transaction Hash:</p>
+                <p className="font-mono break-all">{transactionHash}</p>
+              </div>
+            )}
             <button
               onClick={() => navigate("/results")}
               className="px-6 py-3 bg-primary text-white rounded-lg font-medium shadow hover:shadow-md transition-all"
@@ -161,6 +259,30 @@ const VotingInterface = () => {
               </div>
             )}
             
+            {/* Blockchain status */}
+            {hasEthereumProvider ? (
+              <div className="flex items-center gap-2 justify-center mb-4 text-sm">
+                <div className={`w-3 h-3 rounded-full ${walletConnected ? 'bg-green-500' : 'bg-amber-500'}`}></div>
+                <span>{walletConnected ? 'Wallet Connected' : 'Wallet Ready'}</span>
+              </div>
+            ) : (
+              <div className="bg-amber-50 border border-amber-200 rounded-lg p-3 mb-4 flex items-start gap-2">
+                <AlertCircle className="w-5 h-5 text-amber-500 flex-shrink-0 mt-0.5" />
+                <div>
+                  <p className="text-sm font-medium text-amber-800">No Ethereum wallet detected</p>
+                  <p className="text-xs text-amber-700">
+                    MetaMask not found. Your vote will be simulated.
+                  </p>
+                </div>
+              </div>
+            )}
+            
+            {blockchainError && (
+              <div className="bg-destructive/10 border border-destructive/30 rounded-lg p-3 mb-4">
+                <p className="text-sm font-medium text-destructive">Error: {blockchainError}</p>
+              </div>
+            )}
+            
             <div className="bg-secondary rounded-lg p-4 mb-6">
               <p className="text-sm text-center text-muted-foreground">
                 By submitting your vote, you confirm that this is your final choice. 
@@ -177,22 +299,29 @@ const VotingInterface = () => {
                 Back
               </button>
               <button
-                onClick={handleSubmitVote}
+                onClick={hasEthereumProvider ? handleSubmitVote : handleSimulateVote}
                 disabled={isSubmitting}
                 className="flex-1 px-4 py-3 bg-primary text-white rounded-lg font-medium shadow hover:shadow-md transition-all disabled:opacity-70 flex items-center justify-center"
               >
                 {isSubmitting ? (
                   <>
                     <Loader2 className="w-5 h-5 mr-2 animate-spin" />
-                    Submitting...
+                    {walletConnected ? 'Submitting...' : 'Connecting...'}
                   </>
                 ) : (
-                  "Submit Vote"
+                  `${hasEthereumProvider ? 'Submit Vote' : 'Simulate Vote'}`
                 )}
               </button>
             </div>
           </div>
         )}
+
+        {/* Blockchain explainer */}
+        <div className="mt-6 text-center">
+          <p className="text-xs text-muted-foreground">
+            This voting system is secured by blockchain technology to ensure vote integrity and transparency.
+          </p>
+        </div>
       </div>
     </section>
   );
