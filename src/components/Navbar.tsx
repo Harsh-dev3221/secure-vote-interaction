@@ -146,9 +146,9 @@ const Navbar = () => {
                 EN
               </span>
               <Switch 
+                className="scale-75" 
                 checked={language === "hindi"} 
                 onCheckedChange={handleLanguageToggle}
-                size="sm"
                 aria-label="Toggle language"
               />
               <span className={`text-xs ${language === "hindi" ? "font-bold text-primary" : "text-muted-foreground"}`}>
