@@ -1,0 +1,3 @@
+@echo off
+echo Starting mock Hyperledger Fabric API server...
+nodemon ..\..\blockchain\server.js 

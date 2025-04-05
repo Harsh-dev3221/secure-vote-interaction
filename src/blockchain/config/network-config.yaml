@@ -1,0 +1,112 @@
+---
+# Basic Fabric network configuration for voting system
+name: secure-vote-fabric-network
+version: 1.0.0
+
+# Organizations in the network
+organizations:
+  ElectionCommission:
+    mspid: ElectionCommissionMSP
+    domain: electioncommission.example.com
+    enableNodeOUs: true
+    peers:
+      - peer0.electioncommission.example.com
+    users:
+      Admin:
+        cert:
+          pem: ""
+      User1:
+        cert:
+          pem: ""
+
+  VotingMachines:
+    mspid: VotingMachinesMSP
+    domain: votingmachines.example.com
+    enableNodeOUs: true
+    peers:
+      - peer0.votingmachines.example.com
+    users:
+      Admin:
+        cert:
+          pem: ""
+      User1:
+        cert:
+          pem: ""
+
+  Auditors:
+    mspid: AuditorsMSP
+    domain: auditors.example.com
+    enableNodeOUs: true
+    peers:
+      - peer0.auditors.example.com
+    users:
+      Admin:
+        cert:
+          pem: ""
+      User1:
+        cert:
+          pem: ""
+
+# Orderer configuration
+orderers:
+  orderer.example.com:
+    url: grpcs://orderer.example.com:7050
+    grpcOptions:
+      ssl-target-name-override: orderer.example.com
+    tlsCACerts:
+      pem: ""
+
+# Peer configurations
+peers:
+  peer0.electioncommission.example.com:
+    url: grpcs://peer0.electioncommission.example.com:7051
+    grpcOptions:
+      ssl-target-name-override: peer0.electioncommission.example.com
+    tlsCACerts:
+      pem: ""
+
+  peer0.votingmachines.example.com:
+    url: grpcs://peer0.votingmachines.example.com:7051
+    grpcOptions:
+      ssl-target-name-override: peer0.votingmachines.example.com
+    tlsCACerts:
+      pem: ""
+
+  peer0.auditors.example.com:
+    url: grpcs://peer0.auditors.example.com:7051
+    grpcOptions:
+      ssl-target-name-override: peer0.auditors.example.com
+    tlsCACerts:
+      pem: ""
+
+# Channel configuration
+channels:
+  electionchannel:
+    orderers:
+      - orderer.example.com
+    peers:
+      peer0.electioncommission.example.com:
+        endorsingPeer: true
+        chaincodeQuery: true
+        ledgerQuery: true
+        eventSource: true
+      peer0.votingmachines.example.com:
+        endorsingPeer: true
+        chaincodeQuery: true
+        ledgerQuery: true
+        eventSource: true
+      peer0.auditors.example.com:
+        endorsingPeer: false
+        chaincodeQuery: true
+        ledgerQuery: true
+        eventSource: true
+    policies:
+      Readers:
+        Type: ImplicitMeta
+        Rule: "ANY Readers"
+      Writers:
+        Type: ImplicitMeta
+        Rule: "ANY Writers"
+      Admins:
+        Type: ImplicitMeta
+        Rule: "MAJORITY Admins" 
