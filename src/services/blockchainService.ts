@@ -1,6 +1,9 @@
-
 import { ethers } from "ethers";
 import { useToast } from "@/hooks/use-toast";
+import VotingABI from '../../blockchain/artifacts/contracts/Voting.sol/Voting.json';
+import { CryptoUtils, SecurityAuditLogger } from "../utils/securityUtils";
+import { AadharValidator, AntiSpoofingDetector } from "../utils/aadharValidator";
+import { secureConfig } from "../utils/secureConfig";
 
 // Smart contract ABI (Application Binary Interface)
 // This is a placeholder and should be replaced with your actual contract ABI after deployment
@@ -10,290 +13,329 @@ const electionContractABI = [
   "function getCandidateVoteCount(uint256 candidateId) public view returns (uint256)"
 ];
 
-// Contract addresses - replace with your actual deployed contract addresses
-const ELECTION_CONTRACT_ADDRESS = "0x0000000000000000000000000000000000000000"; // Replace with actual address after deployment
-const POLYGON_CONTRACT_ADDRESS = "0x0000000000000000000000000000000000000000"; // Replace with Polygon contract address
+// Use secure configuration for contract address and admin private key
+const VOTING_CONTRACT_ADDRESS = secureConfig.get<string>('blockchain.contractAddress');
+const ADMIN_PRIVATE_KEY = secureConfig.get<string>('blockchain.adminPrivateKey');
 
-// Blockchain configuration
-export const blockchainConfig = {
-  // Ethereum (Sepolia) configuration
-  ethereum: {
-    networkName: "Sepolia Test Network",
-    chainId: 11155111, // Sepolia chain ID
-    blockExplorerUrl: "https://sepolia.etherscan.io",
-    rpcUrl: "https://eth-sepolia.public.blastapi.io",
-  },
-  // Polygon (Mumbai testnet) configuration
-  polygon: {
-    networkName: "Polygon Mumbai",
-    chainId: 80001, // Mumbai testnet chain ID
-    blockExplorerUrl: "https://mumbai.polygonscan.com",
-    rpcUrl: "https://rpc-mumbai.maticvigil.com",
-  }
-};
-
-// Track which blockchain to use
-let activeBlockchain: "ethereum" | "polygon" = "polygon"; // Default to Polygon for lower fees
-
-/**
- * Sets which blockchain to use
- */
-export function setActiveBlockchain(blockchain: "ethereum" | "polygon") {
-  activeBlockchain = blockchain;
-}
-
-/**
- * Gets current active blockchain
- */
-export function getActiveBlockchain() {
-  return activeBlockchain;
-}
-
-/**
- * Connects to provider for the active blockchain
- */
-export async function getEthereumProvider() {
-  const config = blockchainConfig[activeBlockchain];
-  
-  if (window.ethereum) {
-    // Connect to MetaMask
-    try {
-      const provider = new ethers.BrowserProvider(window.ethereum);
-      
-      // Check if we need to switch networks
-      const network = await provider.getNetwork();
-      if (network.chainId !== BigInt(config.chainId)) {
-        try {
-          // Request network switch
-          await window.ethereum.request({
-            method: 'wallet_switchEthereumChain',
-            params: [{ chainId: `0x${config.chainId.toString(16)}` }],
-          });
-        } catch (switchError: any) {
-          // If network doesn't exist in wallet, add it
-          if (switchError.code === 4902) {
-            await window.ethereum.request({
-              method: 'wallet_addEthereumChain',
-              params: [
-                {
-                  chainId: `0x${config.chainId.toString(16)}`,
-                  chainName: config.networkName,
-                  rpcUrls: [config.rpcUrl],
-                  blockExplorerUrls: [config.blockExplorerUrl],
-                  nativeCurrency: {
-                    name: activeBlockchain === "ethereum" ? "Ether" : "MATIC",
-                    symbol: activeBlockchain === "ethereum" ? "ETH" : "MATIC",
-                    decimals: 18
-                  }
-                },
-              ],
-            });
-          } else {
-            throw switchError;
-          }
-        }
-      }
-      return provider;
-    } catch (error) {
-      console.error(`Failed to connect to ${activeBlockchain}:`, error);
-      throw new Error(`Failed to connect to ${config.networkName}`);
-    }
-  } else {
-    // Fallback to a public RPC endpoint for read-only operations
-    return new ethers.JsonRpcProvider(config.rpcUrl);
-  }
-}
-
-/**
- * Requests user to connect their wallet
- */
-export async function connectWallet() {
-  if (!window.ethereum) {
-    throw new Error("No Ethereum wallet found. Please install MetaMask.");
-  }
-  
-  try {
-    // Request account access
-    const accounts = await window.ethereum.request({ method: "eth_requestAccounts" });
-    return accounts[0];
-  } catch (error) {
-    console.error("User denied account access", error);
-    throw new Error("User denied account access");
-  }
-}
-
-/**
- * Gets the election contract instance for the active blockchain
- */
-export async function getElectionContract(withSigner = false) {
-  const provider = await getEthereumProvider();
-  const contractAddress = activeBlockchain === "ethereum" ? 
-    ELECTION_CONTRACT_ADDRESS : POLYGON_CONTRACT_ADDRESS;
-  
-  if (withSigner) {
-    if (!window.ethereum) {
-      throw new Error("No Ethereum wallet found. Please install MetaMask.");
-    }
-    
-    // Get signer for transactions that modify state
-    const signer = await provider.getSigner();
-    return new ethers.Contract(contractAddress, electionContractABI, signer);
-  }
-  
-  // For read-only operations
-  return new ethers.Contract(contractAddress, electionContractABI, provider);
-}
-
-// For the hybrid approach - store votes in memory/local storage first
-interface PendingVote {
+// Database to store vote records and hashed Aadhar information
+// In a real application, this would be a proper database
+interface VoteRecord {
+  aadharHash: string;
+  salt: string;
   candidateId: number;
   timestamp: number;
-  voterAddress?: string; // If available
-  voteId: string; // Unique ID for the vote
-  submitted: boolean;
-}
-
-const PENDING_VOTES_KEY = "PENDING_VOTES";
-
-/**
- * Saves a vote to local storage first (hybrid approach)
- */
-export function saveVoteLocally(candidateId: number): string {
-  const voteId = `vote_${Date.now()}_${Math.random().toString(36).substring(2, 9)}`;
-  
-  const pendingVote: PendingVote = {
-    candidateId,
-    timestamp: Date.now(),
-    voterAddress: window.ethereum ? undefined : undefined, // Can add address if connected
-    voteId,
-    submitted: false
-  };
-  
-  // Get existing pending votes
-  const existingVotesJson = localStorage.getItem(PENDING_VOTES_KEY);
-  const existingVotes: PendingVote[] = existingVotesJson ? JSON.parse(existingVotesJson) : [];
-  
-  // Add the new vote
-  existingVotes.push(pendingVote);
-  
-  // Save back to localStorage
-  localStorage.setItem(PENDING_VOTES_KEY, JSON.stringify(existingVotes));
-  
-  return voteId;
+  signature: string;
+  transactionHash?: string;
 }
 
 /**
- * Get all pending votes that haven't been submitted to blockchain yet
+ * Enhanced BlockchainService with security features
  */
-export function getPendingVotes(): PendingVote[] {
-  const existingVotesJson = localStorage.getItem(PENDING_VOTES_KEY);
-  const allVotes: PendingVote[] = existingVotesJson ? JSON.parse(existingVotesJson) : [];
-  return allVotes.filter(vote => !vote.submitted);
-}
+class BlockchainService {
+  private provider: ethers.JsonRpcProvider;
+  private adminWallet: ethers.Wallet;
+  private contract: ethers.Contract;
+  private voteRecords: VoteRecord[] = [];
+  private static instance: BlockchainService;
 
-/**
- * Mark a vote as submitted to blockchain
- */
-export function markVoteAsSubmitted(voteId: string) {
-  const existingVotesJson = localStorage.getItem(PENDING_VOTES_KEY);
-  const existingVotes: PendingVote[] = existingVotesJson ? JSON.parse(existingVotesJson) : [];
-  
-  const updatedVotes = existingVotes.map(vote => {
-    if (vote.voteId === voteId) {
-      return { ...vote, submitted: true };
+  /**
+   * Private constructor for singleton pattern
+   */
+  private constructor() {
+    // Connect to blockchain provider
+    this.provider = new ethers.JsonRpcProvider(secureConfig.get<string>('blockchain.providerUrl'));
+
+    // Initialize admin wallet securely
+    this.adminWallet = new ethers.Wallet(ADMIN_PRIVATE_KEY, this.provider);
+
+    // Initialize contract with admin wallet
+    this.contract = new ethers.Contract(
+      VOTING_CONTRACT_ADDRESS,
+      VotingABI.abi,
+      this.adminWallet
+    );
+
+    console.log("BlockchainService initialized and connected to provider");
+  }
+
+  /**
+   * Get singleton instance
+   */
+  public static getInstance(): BlockchainService {
+    if (!BlockchainService.instance) {
+      BlockchainService.instance = new BlockchainService();
     }
-    return vote;
-  });
-  
-  localStorage.setItem(PENDING_VOTES_KEY, JSON.stringify(updatedVotes));
-}
+    return BlockchainService.instance;
+  }
 
-/**
- * Submits a vote to the blockchain
- */
-export async function submitVoteToBlockchain(candidateId: number) {
-  try {
-    // First save locally (hybrid approach)
-    const voteId = saveVoteLocally(candidateId);
-    
-    // Then try to submit to blockchain if wallet is available
-    if (isEthereumProviderAvailable()) {
-      const contract = await getElectionContract(true);
-      const tx = await contract.castVote(candidateId);
-      
-      // Wait for transaction to be mined
+  /**
+   * Cast a vote securely using advanced security measures
+   */
+  async castVote(candidateId: number, aadharNumber: string, ipAddress: string): Promise<any> {
+    try {
+      // Step 1: Advanced Aadhar validation
+      const validation = AadharValidator.validateAadhar(aadharNumber);
+      if (!validation.isValid) {
+        SecurityAuditLogger.logSecurityEvent(
+          'VALIDATION_FAILURE',
+          {
+            aadharNumber,
+            candidateId,
+            errors: validation.errors
+          },
+          ipAddress
+        );
+        return {
+          success: false,
+          error: validation.errors.join(', ')
+        };
+      }
+
+      // Step 2: Anti-spoofing check
+      const spoofingCheck = AntiSpoofingDetector.checkForSuspiciousActivity(
+        ipAddress,
+        aadharNumber,
+        'browser-user-agent' // In real app, get this from request
+      );
+
+      if (spoofingCheck.isSuspicious) {
+        SecurityAuditLogger.logSecurityEvent(
+          'SUSPICIOUS_ACTIVITY',
+          {
+            aadharNumber,
+            reason: spoofingCheck.reason
+          },
+          ipAddress
+        );
+        return {
+          success: false,
+          error: 'Suspicious activity detected. Please try again later.'
+        };
+      }
+
+      // Step 3: Secure hashing of Aadhar
+      const { hash: aadharHash, salt } = CryptoUtils.secureHashAadhar(aadharNumber);
+
+      // Step 4: Check if this Aadhar hash has already voted
+      const existingVote = this.voteRecords.find(record => record.aadharHash === aadharHash);
+      if (existingVote) {
+        SecurityAuditLogger.logSecurityEvent(
+          'VOTE',
+          {
+            aadharNumber,
+            status: 'DUPLICATE'
+          },
+          ipAddress
+        );
+        return {
+          success: false,
+          error: 'This Aadhar number has already been used to vote'
+        };
+      }
+
+      // Step 5: Generate a unique blockchain address from the Aadhar hash
+      const aadharDerivedAddress = this.generateBlockchainAddressFromHash(aadharHash);
+
+      // Step 6: Check if this address has already voted on the blockchain
+      const hasVoted = await this.contract.hasVoted(aadharDerivedAddress);
+      if (hasVoted) {
+        SecurityAuditLogger.logSecurityEvent(
+          'VOTE',
+          {
+            aadharNumber,
+            status: 'BLOCKCHAIN_DUPLICATE'
+          },
+          ipAddress
+        );
+        return {
+          success: false,
+          error: 'This Aadhar number has already been used to vote on the blockchain'
+        };
+      }
+
+      // Step 7: Create digital signature for the vote
+      const timestamp = Date.now();
+      const signature = CryptoUtils.generateVoteSignature(candidateId, aadharHash, timestamp);
+
+      // Step 8: Record vote details before blockchain transaction
+      const voteRecord: VoteRecord = {
+        aadharHash,
+        salt,
+        candidateId,
+        timestamp,
+        signature
+      };
+      this.voteRecords.push(voteRecord);
+
+      // Step 9: Cast the vote on the blockchain
+      // In a real application with Aadhar, you would use a secure oracle or validator
+      // to verify the Aadhar before allowing the vote
+      const tx = await this.contract.vote(candidateId);
       const receipt = await tx.wait();
-      
-      // Mark as submitted in local storage
-      markVoteAsSubmitted(voteId);
-      
+
+      // Step 10: Update record with transaction hash
+      const recordIndex = this.voteRecords.findIndex(record => record.aadharHash === aadharHash);
+      if (recordIndex >= 0) {
+        this.voteRecords[recordIndex].transactionHash = receipt.hash;
+      }
+
+      // Step 11: Log the successful vote
+      SecurityAuditLogger.logSecurityEvent(
+        'VOTE',
+        {
+          aadharNumber,
+          candidateId,
+          status: 'SUCCESS',
+          transactionHash: receipt.hash
+        },
+        ipAddress
+      );
+
+      // Return success response
       return {
         success: true,
         transactionHash: receipt.hash,
-        blockNumber: receipt.blockNumber,
-        voteId,
-        blockchain: activeBlockchain
+        signature: signature
       };
-    } else {
-      // Return successful response for hybrid approach even without blockchain
+    } catch (error: any) {
+      // Log the error
+      console.error("Error in castVote:", error);
+      SecurityAuditLogger.logSecurityEvent(
+        'VOTE',
+        {
+          aadharNumber,
+          candidateId,
+          status: 'ERROR',
+          error: error.message
+        },
+        ipAddress
+      );
+
+      // Record failed attempt for rate limiting
+      AntiSpoofingDetector.recordFailedAttempt(ipAddress);
+
       return {
-        success: true,
-        transactionHash: null,
-        blockNumber: null,
-        voteId,
-        blockchain: "hybrid_local"
-      };
-    }
-  } catch (error) {
-    console.error("Error submitting vote to blockchain:", error);
-    throw error;
-  }
-}
-
-/**
- * Check if MetaMask or another Ethereum provider is installed
- */
-export function isEthereumProviderAvailable() {
-  return window.ethereum !== undefined;
-}
-
-// Batch submit pending votes to blockchain (for admin use)
-export async function batchSubmitPendingVotes() {
-  if (!isEthereumProviderAvailable()) {
-    throw new Error("Ethereum provider needed for batch submission");
-  }
-  
-  const pendingVotes = getPendingVotes();
-  const results = [];
-  
-  for (const vote of pendingVotes) {
-    try {
-      const contract = await getElectionContract(true);
-      const tx = await contract.castVote(vote.candidateId);
-      const receipt = await tx.wait();
-      
-      markVoteAsSubmitted(vote.voteId);
-      
-      results.push({
-        voteId: vote.voteId,
-        success: true,
-        transactionHash: receipt.hash
-      });
-    } catch (error) {
-      results.push({
-        voteId: vote.voteId,
         success: false,
         error: error.message
-      });
+      };
     }
   }
-  
-  return results;
-}
 
-// Add for TypeScript support
-declare global {
-  interface Window {
-    ethereum?: any;
+  /**
+   * Get all candidates and their vote counts
+   */
+  async getCandidates(): Promise<any> {
+    try {
+      const candidateCount = await this.contract.getCandidateCount();
+      const candidates = [];
+
+      for (let i = 0; i < Number(candidateCount); i++) {
+        const candidate = await this.contract.getCandidate(i);
+        candidates.push({
+          id: i,
+          name: candidate[0], // First return value is name
+          voteCount: candidate[1].toString() // Second return value is voteCount
+        });
+      }
+
+      return {
+        success: true,
+        candidates
+      };
+    } catch (error: any) {
+      console.error("Error in getCandidates:", error);
+      return {
+        success: false,
+        error: error.message
+      };
+    }
+  }
+
+  /**
+   * Check if an Aadhar number has already been used to vote
+   */
+  async hasVoted(aadharNumber: string, ipAddress: string): Promise<any> {
+    try {
+      // First validate the Aadhar
+      const validation = AadharValidator.validateAadhar(aadharNumber);
+      if (!validation.isValid) {
+        return {
+          success: false,
+          error: validation.errors.join(', ')
+        };
+      }
+
+      // Generate hash of Aadhar
+      const { hash: aadharHash } = CryptoUtils.secureHashAadhar(aadharNumber);
+
+      // Check local records first
+      const existingVote = this.voteRecords.find(record => record.aadharHash === aadharHash);
+      if (existingVote) {
+        return {
+          success: true,
+          hasVoted: true,
+          voteDetails: {
+            timestamp: existingVote.timestamp,
+            candidateId: existingVote.candidateId
+          }
+        };
+      }
+
+      // If not found locally, check the blockchain as a fallback
+      const aadharDerivedAddress = this.generateBlockchainAddressFromHash(aadharHash);
+      const voted = await this.contract.hasVoted(aadharDerivedAddress);
+
+      return {
+        success: true,
+        hasVoted: voted
+      };
+    } catch (error: any) {
+      console.error("Error in hasVoted:", error);
+      return {
+        success: false,
+        error: error.message
+      };
+    }
+  }
+
+  /**
+   * Validate a vote signature to prevent tampering
+   */
+  verifyVoteSignature(signature: string, candidateId: number, aadharNumber: string, timestamp: number): boolean {
+    // Generate Aadhar hash
+    const { hash: aadharHash } = CryptoUtils.secureHashAadhar(aadharNumber);
+
+    // Verify the signature
+    return CryptoUtils.verifyVoteSignature(signature, candidateId, aadharHash, timestamp);
+  }
+
+  /**
+   * Generate a blockchain address from an Aadhar hash
+   */
+  private generateBlockchainAddressFromHash(aadharHash: string): string {
+    // Create a deterministic address from the hash
+    const derivedAddress = ethers.getAddress('0x' + aadharHash.slice(-40));
+    return derivedAddress;
   }
 }
+
+// Export as singleton instance
+export const blockchainService = BlockchainService.getInstance();
+
+// For compatibility with existing code, provide these functions
+export function isEthereumProviderAvailable() {
+  // Always return true since we're using the admin wallet approach
+  return true;
+}
+
+export function getActiveBlockchain() {
+  // Return a default value for compatibility
+  return "local";
+}
+
+export function getPendingVotes() {
+  // Return empty array for compatibility
+  return [];
+}
+
+//

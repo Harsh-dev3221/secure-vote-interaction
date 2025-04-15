@@ -4,29 +4,15 @@
   "version": "0.0.0",
   "type": "module",
   "scripts": {
-    "dev": "vite",
+    "dev": "nodemon src/app.js",
     "build": "tsc && vite build",
     "lint": "eslint . --ext ts,tsx --report-unused-disable-directives --max-warnings 0",
     "preview": "vite preview",
-    "fabric:dev": "node src/blockchain/server.cjs",
-    "fabric:real": "node src/blockchain/server-real.cjs",
-    "fabric:wsl": "node src/blockchain/server-wsl.cjs",
-    "fabric:test": "node src/blockchain/test-api.cjs",
-    "fabric:setup": "node src/blockchain/setup-connection.js",
-    "fabric:deploy": "node src/blockchain/deploy-chaincode.js",
-    "fabric:setup-wsl": "node src/blockchain/setup-fabric.js",
-    "fabric:setup-direct": "node src/blockchain/setup-direct.js",
-    "fabric:fix-tls": "node src/blockchain/setup-tls-workaround.js",
-    "fabric:wsl-fixed": "npm run fabric:fix-tls && node src/blockchain/server-wsl.cjs",
-    "fabric:wsl-proxy-setup": "node src/blockchain/setup-wsl-proxy.js",
-    "fabric:simple-proxy": "node src/blockchain/simple-wsl-setup.js",
-    "fabric:docker-setup": "setup-docker.bat",
-    "fabric:docker-down": "docker-compose -f docker-compose-direct.yaml down",
-    "fabric:docker-api": "docker-compose -f docker-compose-api-only.yaml up -d",
-    "fabric:docker-api-down": "docker-compose -f docker-compose-api-only.yaml down",
-    "fabric:direct-api": "docker-compose -f docker-compose-direct-api.yaml up -d",
-    "fabric:direct-api-down": "docker-compose -f docker-compose-direct-api.yaml down",
-    "fabric:start-direct": "node src/blockchain/start-direct-server.js"
+    "fabric:start": "chmod +x ./start-fabric.sh && ./start-fabric.sh",
+    "fabric:deploy": "chmod +x ./deploy-chaincode.sh && ./deploy-chaincode.sh",
+    "fabric:deploy-real": "deploy-real.bat",
+    "fabric:real": "node src/blockchain/fabric-server.js",
+    "start": "node src/app.js"
   },
   "dependencies": {
     "@hookform/resolvers": "^3.3.4",
@@ -61,8 +47,12 @@
     "class-variance-authority": "^0.7.0",
     "clsx": "^2.1.0",
     "cmdk": "^0.2.0",
+    "cors": "^2.8.5",
+    "dotenv": "^16.0.3",
     "embla-carousel-react": "^8.0.0-rc19",
+    "express": "^4.18.2",
     "i18next": "^23.7.16",
+    "js-yaml": "^4.1.0",
     "lucide-react": "^0.319.0",
     "next-themes": "^0.2.1",
     "qrcode.react": "^3.1.0",
@@ -81,6 +71,10 @@
     "zod": "^3.22.4"
   },
   "devDependencies": {
+    "@nomicfoundation/hardhat-toolbox": "^5.0.0",
+    "@openzeppelin/contracts": "^5.2.0",
+    "@truffle/hdwallet-provider": "^2.1.15",
+    "@types/js-yaml": "^4.0.9",
     "@types/node": "^20.11.5",
     "@types/react": "^18.2.43",
     "@types/react-dom": "^18.2.17",
@@ -91,9 +85,25 @@
     "eslint": "^8.55.0",
     "eslint-plugin-react-hooks": "^4.6.0",
     "eslint-plugin-react-refresh": "^0.4.5",
+    "ganache": "^7.9.2",
+    "hardhat": "^2.22.19",
     "postcss": "^8.4.33",
     "tailwindcss": "^3.4.1",
+    "truffle": "^5.11.5",
     "typescript": "^5.2.2",
     "vite": "^5.0.8"
-  }
+  },
+  "description": "This application uses the Hyperledger Fabric Gateway method to connect to the IBM Blockchain Platform test network.",
+  "main": "eslint.config.js",
+  "repository": {
+    "type": "git",
+    "url": "git+https://github.com/Harsh-dev3221/secure-vote-interaction.git"
+  },
+  "keywords": [],
+  "author": "",
+  "license": "ISC",
+  "bugs": {
+    "url": "https://github.com/Harsh-dev3221/secure-vote-interaction/issues"
+  },
+  "homepage": "https://github.com/Harsh-dev3221/secure-vote-interaction#readme"
 }
