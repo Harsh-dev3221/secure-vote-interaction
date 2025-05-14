@@ -1,17 +1,19 @@
-import { ethers } from "ethers";
+// Import ethers in a way that works in both browser and Node.js
+import * as ethers from "ethers";
 import { useToast } from "@/hooks/use-toast";
-import VotingABI from '../../blockchain/artifacts/contracts/Voting.sol/Voting.json';
 import { CryptoUtils, SecurityAuditLogger } from "../utils/securityUtils";
 import { AadharValidator, AntiSpoofingDetector } from "../utils/aadharValidator";
 import { secureConfig } from "../utils/secureConfig";
 
-// Smart contract ABI (Application Binary Interface)
-// This is a placeholder and should be replaced with your actual contract ABI after deployment
-const electionContractABI = [
-  // Sample ABI for a voting contract
-  "function castVote(uint256 candidateId) public",
-  "function getCandidateVoteCount(uint256 candidateId) public view returns (uint256)"
-];
+// Mock ABI for development - in production, import your actual ABI
+const mockVotingABI = {
+  abi: [
+    "function vote(uint256 candidateId) public",
+    "function hasVoted(address voter) public view returns (bool)",
+    "function getCandidateCount() public view returns (uint256)",
+    "function getCandidate(uint256 id) public view returns (string memory name, uint256 voteCount)"
+  ]
+};
 
 // Use secure configuration for contract address and admin private key
 const VOTING_CONTRACT_ADDRESS = secureConfig.get<string>('blockchain.contractAddress');
@@ -30,42 +32,93 @@ interface VoteRecord {
 
 /**
  * Enhanced BlockchainService with security features
+ * Browser-compatible version
  */
 class BlockchainService {
-  private provider: ethers.JsonRpcProvider;
-  private adminWallet: ethers.Wallet;
-  private contract: ethers.Contract;
+  // Use any type to avoid version-specific type issues
+  private provider: any;
+  private adminWallet: any;
+  private contract: any;
   private voteRecords: VoteRecord[] = [];
   private static instance: BlockchainService;
+  private isInitialized: boolean = false;
 
   /**
    * Private constructor for singleton pattern
    */
   private constructor() {
-    // Connect to blockchain provider
-    this.provider = new ethers.JsonRpcProvider(secureConfig.get<string>('blockchain.providerUrl'));
+    console.log("BlockchainService instance created - will initialize on demand");
+  }
 
-    // Initialize admin wallet securely
-    this.adminWallet = new ethers.Wallet(ADMIN_PRIVATE_KEY, this.provider);
+  /**
+   * Initialize the blockchain connection
+   * This is separated from the constructor to allow async initialization
+   */
+  public async initialize(): Promise<void> {
+    try {
+      if (this.isInitialized) {
+        return;
+      }
 
-    // Initialize contract with admin wallet
-    this.contract = new ethers.Contract(
-      VOTING_CONTRACT_ADDRESS,
-      VotingABI.abi,
-      this.adminWallet
-    );
+      // Connect to blockchain provider - handle both v5 and v6 ethers.js
+      const providerUrl = secureConfig.get<string>('blockchain.providerUrl');
 
-    console.log("BlockchainService initialized and connected to provider");
+      // Try v6 style first
+      try {
+        this.provider = new ethers.JsonRpcProvider(providerUrl);
+      } catch (e) {
+        // Fall back to v5 style if v6 fails
+        this.provider = new ethers.providers.JsonRpcProvider(providerUrl);
+      }
+
+      // Initialize admin wallet securely - handle both v5 and v6 ethers.js
+      try {
+        this.adminWallet = new ethers.Wallet(ADMIN_PRIVATE_KEY, this.provider);
+      } catch (e) {
+        // Fall back to v5 style
+        this.adminWallet = new ethers.Wallet(ADMIN_PRIVATE_KEY).connect(this.provider);
+      }
+
+      // Initialize contract with admin wallet
+      this.contract = new ethers.Contract(
+        VOTING_CONTRACT_ADDRESS,
+        mockVotingABI.abi,
+        this.adminWallet
+      );
+
+      this.isInitialized = true;
+      console.log("BlockchainService initialized and connected to provider");
+    } catch (error) {
+      console.error("Failed to initialize BlockchainService:", error);
+      throw error;
+    }
   }
 
   /**
    * Get singleton instance
+   * Note: After getting the instance, you must call initialize() before using it
    */
   public static getInstance(): BlockchainService {
     if (!BlockchainService.instance) {
       BlockchainService.instance = new BlockchainService();
     }
     return BlockchainService.instance;
+  }
+
+  /**
+   * Check if the service is initialized
+   */
+  public isReady(): boolean {
+    return this.isInitialized;
+  }
+
+  /**
+   * Disconnect from the blockchain
+   */
+  public disconnect(): void {
+    console.log("Disconnecting from blockchain provider");
+    // No actual disconnection needed for JsonRpcProvider
+    this.isInitialized = false;
   }
 
   /**
@@ -311,11 +364,22 @@ class BlockchainService {
 
   /**
    * Generate a blockchain address from an Aadhar hash
+   * Compatible with both ethers.js v5 and v6
    */
   private generateBlockchainAddressFromHash(aadharHash: string): string {
-    // Create a deterministic address from the hash
-    const derivedAddress = ethers.getAddress('0x' + aadharHash.slice(-40));
-    return derivedAddress;
+    try {
+      // Try ethers v6 style
+      const derivedAddress = ethers.getAddress('0x' + aadharHash.slice(-40));
+      return derivedAddress;
+    } catch (e) {
+      // Fall back to ethers v5 style
+      try {
+        return ethers.utils.getAddress('0x' + aadharHash.slice(-40));
+      } catch (e2) {
+        // If both fail, just return a formatted address (less secure but works for demo)
+        return '0x' + aadharHash.slice(-40).padStart(40, '0');
+      }
+    }
   }
 }
 

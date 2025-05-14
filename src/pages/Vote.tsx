@@ -1,6 +1,7 @@
 import Navbar from "@/components/Navbar";
 import VotingInterface from "@/components/VotingInterface";
 import BlockchainVoting from "@/components/BlockchainVoting";
+import HardhatVoting from "@/components/HardhatVoting";
 import Footer from "@/components/Footer";
 import { AlertCircle, Coins } from "lucide-react";
 import {
@@ -9,12 +10,13 @@ import {
   getPendingVotes
 } from "@/services/blockchainService";
 import { useEffect, useState } from "react";
+import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 
 const Vote = () => {
   const hasEthereumProvider = isEthereumProviderAvailable();
   const [activeBlockchain, setActiveBlockchain] = useState(getActiveBlockchain());
   const [pendingVotes, setPendingVotes] = useState(0);
-  const [useBlockchainVoting, setUseBlockchainVoting] = useState(true); // Toggle between voting interfaces
+  const [activeTab, setActiveTab] = useState("hardhat"); // Default to Hardhat
 
   useEffect(() => {
     // Check for pending votes
@@ -47,16 +49,6 @@ const Vote = () => {
             </span>
           </div>
 
-          {/* Toggle between voting interfaces */}
-          <div className="flex items-center gap-2 mt-2 md:mt-0">
-            <button
-              onClick={() => setUseBlockchainVoting(!useBlockchainVoting)}
-              className="text-sm bg-primary text-white px-3 py-1 rounded-md"
-            >
-              Switch to {useBlockchainVoting ? "Regular" : "Blockchain"} Voting
-            </button>
-          </div>
-
           {!hasEthereumProvider && (
             <div className="flex items-center gap-2 mt-2 md:mt-0">
               <AlertCircle className="w-4 h-4 text-amber-500" />
@@ -76,7 +68,29 @@ const Vote = () => {
         </div>
       </div>
       <div className="flex-grow">
-        {useBlockchainVoting ? <BlockchainVoting /> : <VotingInterface />}
+        <div className="container mx-auto py-8">
+          <Tabs defaultValue="hardhat" value={activeTab} onValueChange={setActiveTab} className="w-full">
+            <div className="flex justify-center mb-6">
+              <TabsList>
+                <TabsTrigger value="hardhat">Hardhat/Ganache</TabsTrigger>
+                <TabsTrigger value="aadhar">Aadhar-Based</TabsTrigger>
+                <TabsTrigger value="metamask">MetaMask</TabsTrigger>
+              </TabsList>
+            </div>
+
+            <TabsContent value="hardhat">
+              <HardhatVoting />
+            </TabsContent>
+
+            <TabsContent value="aadhar">
+              <BlockchainVoting />
+            </TabsContent>
+
+            <TabsContent value="metamask">
+              <VotingInterface />
+            </TabsContent>
+          </Tabs>
+        </div>
       </div>
       <Footer />
     </div>

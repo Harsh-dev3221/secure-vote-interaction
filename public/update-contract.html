@@ -1,0 +1,110 @@
+<!DOCTYPE html>
+<html>
+
+<head>
+    <title>Update Contract Address</title>
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <style>
+        body {
+            font-family: Arial, sans-serif;
+            max-width: 800px;
+            margin: 0 auto;
+            padding: 20px;
+        }
+
+        .card {
+            border: 1px solid #ccc;
+            border-radius: 8px;
+            padding: 20px;
+            margin-bottom: 20px;
+            background-color: #f9f9f9;
+        }
+
+        .success {
+            color: green;
+            font-weight: bold;
+        }
+
+        .error {
+            color: red;
+            font-weight: bold;
+        }
+
+        button {
+            background-color: #4CAF50;
+            color: white;
+            padding: 10px 15px;
+            border: none;
+            border-radius: 4px;
+            cursor: pointer;
+        }
+
+        button:hover {
+            background-color: #45a049;
+        }
+    </style>
+</head>
+
+<body>
+    <h1>Voting Contract Address Manager</h1>
+
+    <div class="card">
+        <h2>Current Contract Address</h2>
+        <p>Current address in localStorage: <span id="current-address">None</span></p>
+    </div>
+
+    <div class="card">
+        <h2>Update Contract Address</h2>
+        <p>Contract address from deployment: <span id="new-address">Loading...</span></p>
+        <p>Network: <span id="network-info">Loading...</span></p>
+        <button id="update-btn">Update Address</button>
+        <p id="status"></p>
+    </div>
+
+    <script>
+        // Display current address from localStorage
+        const currentAddressElement = document.getElementById('current-address');
+        const currentAddress = localStorage.getItem('votingContractAddress');
+        currentAddressElement.textContent = currentAddress || 'None';
+
+        // Fetch contract address from contract-address.json
+        fetch('/contract-address.json')
+            .then(response => {
+                if (!response.ok) {
+                    throw new Error('Failed to fetch contract-address.json');
+                }
+                return response.json();
+            })
+            .then(data => {
+                const newAddressElement = document.getElementById('new-address');
+                newAddressElement.textContent = data.address;
+
+                // Display network information
+                const networkInfoElement = document.getElementById('network-info');
+                networkInfoElement.textContent = `${data.network.name} (${data.network.url})`;
+
+                // Add click handler for update button
+                document.getElementById('update-btn').addEventListener('click', () => {
+                    localStorage.setItem('votingContractAddress', data.address);
+
+                    const statusElement = document.getElementById('status');
+                    statusElement.textContent = `Address updated successfully to ${data.address}`;
+                    statusElement.className = 'success';
+
+                    // Update current address display
+                    currentAddressElement.textContent = data.address;
+                });
+            })
+            .catch(error => {
+                const newAddressElement = document.getElementById('new-address');
+                newAddressElement.textContent = 'Error loading contract address';
+                newAddressElement.className = 'error';
+
+                const statusElement = document.getElementById('status');
+                statusElement.textContent = error.message;
+                statusElement.className = 'error';
+            });
+    </script>
+</body>
+
+</html>

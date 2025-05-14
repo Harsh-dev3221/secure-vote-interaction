@@ -1,59 +1,52 @@
-import dotenv from 'dotenv';
-import fs from 'fs';
-import path from 'path';
-import crypto from 'crypto';
-
-// Load environment variables
-dotenv.config();
+import CryptoJS from 'crypto-js';
 
 /**
  * Secure configuration manager for sensitive application settings
  * Handles environment variables, encryption keys, and secure defaults
+ * Browser-compatible version using CryptoJS
  */
 export class SecureConfig {
     private static instance: SecureConfig;
     private config: Record<string, any> = {};
-    private encryptionKey: Buffer;
+    private encryptionKey: string;
 
     /**
      * Initialize secure configuration with encryption capabilities
      */
     private constructor() {
         // Generate or load encryption key for sensitive data
-        const keyString = process.env.ENCRYPTION_KEY || this.generateFallbackKey();
-        this.encryptionKey = Buffer.from(keyString, 'hex');
+        this.encryptionKey = this.generateFallbackKey();
 
         // Load configuration with defaults and environment overrides
         this.config = {
             // Blockchain configuration
             blockchain: {
-                adminPrivateKey: this.getEnv('ADMIN_PRIVATE_KEY', '0xac0974bec39a17e36ba4a6b4d238ff944bacb478cbed5efcae784d7bf4f2ff80'),
-                contractAddress: this.getEnv('CONTRACT_ADDRESS', '0xD8459cc85e702D3e3504c3a25fe5c5A015Bab842'),
-                providerUrl: this.getEnv('PROVIDER_URL', 'http://127.0.0.1:7545'),
-                networkId: parseInt(this.getEnv('NETWORK_ID', '1337')),
-                gasLimit: parseInt(this.getEnv('GAS_LIMIT', '3000000'))
+                adminPrivateKey: '0xcbc315bb51ad0f0a5ae3daa230e4522b2ba2ceb8b6c690865d3dedea7f7ec724',
+                contractAddress: '0xd19D6fEcC4fd7C481008f36cAd678d118880C466',
+                providerUrl: 'http://127.0.0.1:8545',
+                networkId: 1337,
+                gasLimit: 3000000
             },
 
             // Security settings
             security: {
-                hmacSecret: this.getEnv('HMAC_SECRET', this.generateRandomString(32)),
-                tokenExpiry: parseInt(this.getEnv('TOKEN_EXPIRY', '30')), // minutes
-                rateLimitWindow: parseInt(this.getEnv('RATE_LIMIT_WINDOW', '60000')), // milliseconds
-                rateLimitMax: parseInt(this.getEnv('RATE_LIMIT_MAX', '10')),
-                passwordHashRounds: parseInt(this.getEnv('PASSWORD_HASH_ROUNDS', '10'))
+                hmacSecret: this.generateRandomString(32),
+                tokenExpiry: 30, // minutes
+                rateLimitWindow: 60000, // milliseconds
+                rateLimitMax: 10,
+                passwordHashRounds: 10
             },
 
             // API settings
             api: {
-                port: parseInt(this.getEnv('PORT', '3000')),
-                corsOrigins: this.getEnv('CORS_ORIGINS', 'http://localhost:3000').split(','),
-                sessionSecret: this.getEnv('SESSION_SECRET', this.generateRandomString(32))
+                port: 3000,
+                corsOrigins: ['http://localhost:3000'],
+                sessionSecret: this.generateRandomString(32)
             }
         };
 
         // Log startup configuration (excluding sensitive data)
         console.log('Configuration initialized with the following settings:');
-        console.log('- API Port:', this.config.api.port);
         console.log('- Network ID:', this.config.blockchain.networkId);
         console.log('- Provider URL:', this.config.blockchain.providerUrl);
         // Deliberately not logging private keys and secrets
@@ -89,17 +82,11 @@ export class SecureConfig {
     }
 
     /**
-     * Get environment variable with fallback
-     */
-    private getEnv(key: string, defaultValue: string): string {
-        return process.env[key] || defaultValue;
-    }
-
-    /**
      * Generate a random string (for secrets)
      */
     private generateRandomString(length: number): string {
-        return crypto.randomBytes(length).toString('hex');
+        // Generate random bytes using CryptoJS for browser compatibility
+        return CryptoJS.lib.WordArray.random(length).toString(CryptoJS.enc.Hex);
     }
 
     /**
@@ -107,7 +94,7 @@ export class SecureConfig {
      * WARNING: In production, always provide a proper key via environment variables
      */
     private generateFallbackKey(): string {
-        const fallbackKey = crypto.randomBytes(32).toString('hex');
+        const fallbackKey = this.generateRandomString(32);
         console.warn(
             'WARNING: Using a generated encryption key. This is not secure for production.',
             'Set the ENCRYPTION_KEY environment variable with a secure key.'
@@ -119,29 +106,41 @@ export class SecureConfig {
      * Encrypt sensitive data
      */
     public encrypt(text: string): string {
-        const iv = crypto.randomBytes(16);
-        const cipher = crypto.createCipheriv('aes-256-cbc', this.encryptionKey, iv);
+        // Generate a random IV
+        const iv = CryptoJS.lib.WordArray.random(16);
 
-        let encrypted = cipher.update(text, 'utf8', 'hex');
-        encrypted += cipher.final('hex');
+        // Encrypt using AES
+        const encrypted = CryptoJS.AES.encrypt(text, CryptoJS.enc.Hex.parse(this.encryptionKey), {
+            iv: iv,
+            mode: CryptoJS.mode.CBC,
+            padding: CryptoJS.pad.Pkcs7
+        });
 
-        return `${iv.toString('hex')}:${encrypted}`;
+        // Return IV and ciphertext
+        return iv.toString(CryptoJS.enc.Hex) + ':' + encrypted.toString();
     }
 
     /**
      * Decrypt sensitive data
      */
     public decrypt(encryptedText: string): string {
-        const [ivHex, encryptedData] = encryptedText.split(':');
-        const iv = Buffer.from(ivHex, 'hex');
-        const decipher = crypto.createDecipheriv('aes-256-cbc', this.encryptionKey, iv);
+        try {
+            const [ivHex, encryptedData] = encryptedText.split(':');
 
-        let decrypted = decipher.update(encryptedData, 'hex', 'utf8');
-        decrypted += decipher.final('utf8');
+            // Decrypt using AES
+            const decrypted = CryptoJS.AES.decrypt(encryptedData, CryptoJS.enc.Hex.parse(this.encryptionKey), {
+                iv: CryptoJS.enc.Hex.parse(ivHex),
+                mode: CryptoJS.mode.CBC,
+                padding: CryptoJS.pad.Pkcs7
+            });
 
-        return decrypted;
+            return decrypted.toString(CryptoJS.enc.Utf8);
+        } catch (error) {
+            console.error('Decryption failed:', error);
+            return '';
+        }
     }
 }
 
 // Export a singleton instance
-export const secureConfig = SecureConfig.getInstance(); 
+export const secureConfig = SecureConfig.getInstance();

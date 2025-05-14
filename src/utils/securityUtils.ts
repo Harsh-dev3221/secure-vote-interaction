@@ -1,14 +1,15 @@
-import { createHash, createHmac, randomBytes } from 'crypto';
+import CryptoJS from 'crypto-js';
 
 /**
  * Custom security module for voting system
  * Implements cryptographic functions and security utilities
+ * Uses CryptoJS for browser compatibility
  */
 export class CryptoUtils {
     // Secret key for HMAC operations - in production, this should be in environment variables
-    private static readonly SECRET_KEY = process.env.HMAC_SECRET || 'secure-voting-secret-key-change-in-production';
+    private static readonly SECRET_KEY = 'secure-voting-secret-key-change-in-production';
 
-    // Salt length for hashing operations
+    // Salt length for hashing operations (in bytes)
     private static readonly SALT_LENGTH = 16;
 
     /**
@@ -20,9 +21,7 @@ export class CryptoUtils {
         const salt = this.generateRandomSalt();
 
         // Create SHA-256 hash with salt
-        const hash = createHash('sha256')
-            .update(salt + aadharNumber)
-            .digest('hex');
+        const hash = CryptoJS.SHA256(salt + aadharNumber).toString(CryptoJS.enc.Hex);
 
         return { hash, salt };
     }
@@ -31,10 +30,7 @@ export class CryptoUtils {
      * Verify an Aadhar hash with its original salt
      */
     static verifyAadharHash(aadharNumber: string, salt: string, storedHash: string): boolean {
-        const computedHash = createHash('sha256')
-            .update(salt + aadharNumber)
-            .digest('hex');
-
+        const computedHash = CryptoJS.SHA256(salt + aadharNumber).toString(CryptoJS.enc.Hex);
         return computedHash === storedHash;
     }
 
@@ -44,10 +40,7 @@ export class CryptoUtils {
      */
     static generateVoteSignature(candidateId: number, aadharHash: string, timestamp: number): string {
         const dataToSign = `${aadharHash}:${candidateId}:${timestamp}`;
-
-        return createHmac('sha256', this.SECRET_KEY)
-            .update(dataToSign)
-            .digest('hex');
+        return CryptoJS.HmacSHA256(dataToSign, this.SECRET_KEY).toString(CryptoJS.enc.Hex);
     }
 
     /**
@@ -70,9 +63,7 @@ export class CryptoUtils {
         const expires = Date.now() + expiryMinutes * 60 * 1000;
         const tokenData = `${data}:${expires}`;
 
-        const token = createHmac('sha256', this.SECRET_KEY)
-            .update(tokenData)
-            .digest('hex');
+        const token = CryptoJS.HmacSHA256(tokenData, this.SECRET_KEY).toString(CryptoJS.enc.Hex);
 
         return { token, expires };
     }
@@ -86,9 +77,7 @@ export class CryptoUtils {
         }
 
         const tokenData = `${data}:${expires}`;
-        const expectedToken = createHmac('sha256', this.SECRET_KEY)
-            .update(tokenData)
-            .digest('hex');
+        const expectedToken = CryptoJS.HmacSHA256(tokenData, this.SECRET_KEY).toString(CryptoJS.enc.Hex);
 
         return token === expectedToken;
     }
@@ -97,7 +86,9 @@ export class CryptoUtils {
      * Generate a random salt for hashing
      */
     private static generateRandomSalt(): string {
-        return randomBytes(this.SALT_LENGTH).toString('hex');
+        // Generate random bytes using CryptoJS for browser compatibility
+        const words = CryptoJS.lib.WordArray.random(this.SALT_LENGTH);
+        return words.toString(CryptoJS.enc.Hex);
     }
 
     /**
@@ -179,4 +170,4 @@ export class SecurityAuditLogger {
         // For now, we'll log to console in JSON format
         console.log(`SECURITY_AUDIT: ${JSON.stringify(logEntry)}`);
     }
-} 
+}

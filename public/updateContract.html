@@ -1,0 +1,93 @@
+<!DOCTYPE html>
+<html>
+
+<head>
+    <title>Update Contract Address</title>
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <style>
+        body {
+            font-family: Arial, sans-serif;
+            max-width: 800px;
+            margin: 0 auto;
+            padding: 20px;
+        }
+
+        .card {
+            border: 1px solid #ccc;
+            border-radius: 8px;
+            padding: 20px;
+            margin-bottom: 20px;
+            background-color: #f9f9f9;
+        }
+
+        .success {
+            color: green;
+            font-weight: bold;
+        }
+
+        .error {
+            color: red;
+            font-weight: bold;
+        }
+
+        button {
+            background-color: #4CAF50;
+            color: white;
+            padding: 10px 15px;
+            border: none;
+            border-radius: 4px;
+            cursor: pointer;
+        }
+
+        button:hover {
+            background-color: #45a049;
+        }
+    </style>
+</head>
+
+<body>
+    <h1>Contract Address Update</h1>
+
+    <div class="card">
+        <h2>Current Contract Address</h2>
+        <p>Current address in localStorage: <span id="current-address">None</span></p>
+    </div>
+
+    <div class="card">
+        <h2>Update Contract Address</h2>
+        <p>Enter the wallet address of the user who will cast votes:</p>
+        <label for="wallet-address">Wallet Address:</label>
+        <input type="text" id="wallet-address" placeholder="Enter wallet address" title="Ethereum wallet address"
+            value="0xf2859C2af2b6CF5C6590e6Aed14e649bc524Cb76" style="width: 100%; padding: 8px; margin-bottom: 10px;">
+        <p>Update to first account address:</p>
+        <button id="update-btn">Use First Account as Contract</button>
+        <p id="status"></p>
+    </div>
+
+    <script>
+        // Display current address from localStorage
+        const currentAddressElement = document.getElementById('current-address');
+        const currentAddress = localStorage.getItem('votingContractAddress');
+        currentAddressElement.textContent = currentAddress || 'None';
+
+        // Add click handler for update button
+        document.getElementById('update-btn').addEventListener('click', () => {
+            // Use the first account address as the contract address
+            const firstAddress = '0xf2859C2af2b6CF5C6590e6Aed14e649bc524Cb76';
+            localStorage.setItem('votingContractAddress', firstAddress);
+
+            // Also store the wallet address
+            const walletAddress = document.getElementById('wallet-address').value;
+            localStorage.setItem('voterWalletAddress', walletAddress);
+
+            const statusElement = document.getElementById('status');
+            statusElement.textContent = `Contract address updated to ${firstAddress}`;
+            statusElement.className = 'success';
+
+            // Update current address display
+            currentAddressElement.textContent = firstAddress;
+        });
+    </script>
+</body>
+
+</html>

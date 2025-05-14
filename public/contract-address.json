@@ -1,0 +1,15 @@
+{
+  "address": "0x38E4Ef32A7c688bfacE40304355D0243802fb6Cf",
+  "network": {
+    "name": "ganache",
+    "chainId": 1337,
+    "url": "http://127.0.0.1:7545"
+  },
+  "deployedAt": "2025-05-14T20:29:21.143Z",
+  "candidates": [
+    "Jane Smith",
+    "John Adams",
+    "Sarah Johnson",
+    "Michael Chen"
+  ]
+}

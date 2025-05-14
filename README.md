@@ -1,78 +1,53 @@
-# Secure Vote Application - IBM Blockchain Platform
+# Secure Voting System with Blockchain Integration
 
-This application uses the Hyperledger Fabric Gateway method to connect to the IBM Blockchain Platform test network.
+A secure voting application that uses Aadhar-based identity verification and blockchain technology for transparent, tamper-proof vote recording.
 
-## Prerequisites
+## Project Structure
 
-1. Node.js (v14 or later)
-2. OpenSSL (for certificate generation)
-3. IBM Cloud account (free)
+The project has been cleaned and optimized to focus only on the essential files needed for the Ganache blockchain integration. The current implementation uses the first Ganache account as both the contract address and transaction signer - creating a simplified but functional blockchain voting experience.
 
-## Setup
+## Project Setup
 
 1. Install dependencies:
-```bash
-npm install
-```
+   ```bash
+   npm install
+   ```
 
-2. Set up the IBM Blockchain Platform test network:
-```bash
-setup-ibp-test-network.bat
-```
+2. Start the development server:
+   ```bash
+   npm run dev
+   ```
 
-3. Register for an IBM Cloud account:
-   - Go to https://cloud.ibm.com/registration
-   - Create a free account
-   - Get your API key from the IBM Cloud dashboard
+3. The application will run at http://localhost:8080/ or http://localhost:8081/
 
-4. Start the server:
-```bash
-node src/blockchain/fabric-server.js
-```
+## Blockchain Integration (Ganache)
 
-## Configuration
+This application connects to a local Ganache blockchain instance running on port 7545.
 
-The application is configured to connect to the IBM Blockchain Platform test network:
+### How to Setup:
 
-- Channel: `mychannel`
-- Chaincode: `voting`
-- Organization: `Org1`
-- MSP ID: `Org1MSP`
+1. Make sure Ganache is running on port 7545
+2. Access the update page: http://localhost:8080/updateContract.html (or :8081)
+3. Click the "Use First Account as Contract" button to update the contract address
+4. Navigate back to the main application
 
-## API Endpoints
+### Implementation Details:
 
-- `GET /api/status`: Check connection status
-- `POST /api/votes`: Create a new vote
-- `POST /api/votes/:id/cast`: Cast a vote
-- `GET /api/votes/:id`: Get vote results
+- **Demo Mode**: The application uses the first Ganache account (with 100 ETH) as both the contract address and the transaction signer
+- **Aadhar to Wallet Mapping**: Each Aadhar number gets deterministically mapped to a wallet address
+- **Real Transactions**: Each vote creates a real transaction on the Ganache blockchain
+- **Transaction Verification**: You can see the transactions in the Ganache UI
 
-## Using the IBM Test Network
+## Important Files
 
-1. The test network provides:
-   - A running Fabric network
-   - Pre-configured channels
-   - Sample chaincodes
-   - Free access for development
+- `src/services/ganacheService.ts` - Main service for Ganache blockchain interaction
+- `src/services/aadharWalletService.ts` - Maps Aadhar numbers to blockchain wallets
+- `public/updateContract.html` - Helper page to update contract address
+- `contracts/Voting.sol` - The original smart contract (reference only)
 
-2. To deploy your chaincode:
-   - Use the IBM Blockchain Platform console
-   - Package and install your chaincode
-   - Approve and commit the chaincode definition
+## Tech Stack
 
-## Security
-
-- All certificates are stored in the `wallet` directory
-- TLS is enabled for all network connections
-- Admin identity is required for all operations
-
-## Troubleshooting
-
-1. If connection fails:
-   - Check your IBM Cloud API key
-   - Verify certificate paths in `gateway-config.yaml`
-   - Ensure the wallet contains valid certificates
-
-2. If transactions fail:
-   - Check if the chaincode is installed and instantiated
-   - Verify channel configuration
-   - Check network logs in the IBM Blockchain Platform console
+- React with TypeScript
+- Vite for build/development
+- Ethers.js for blockchain interaction
+- Ganache for local blockchain development 

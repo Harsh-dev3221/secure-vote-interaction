@@ -1,0 +1,44 @@
+{
+  "candidates": [
+    {
+      "id": 0,
+      "name": "Jane Smith",
+      "party": "Progressive Party",
+      "voteCount": 5,
+      "image": "/candidates/jane-smith.jpg"
+    },
+    {
+      "id": 1,
+      "name": "John Adams",
+      "party": "Conservative Alliance",
+      "voteCount": 3,
+      "image": "/candidates/john-adams.jpg"
+    },
+    {
+      "id": 2,
+      "name": "Sarah Johnson",
+      "party": "Citizens United",
+      "voteCount": 7,
+      "image": "/candidates/sarah-johnson.jpg"
+    },
+    {
+      "id": 3,
+      "name": "Michael Chen",
+      "party": "Reform Movement",
+      "voteCount": 2,
+      "image": "/candidates/michael-chen.jpg"
+    }
+  ],
+  "aadharVotes": {},
+  "walletAddresses": [
+    "0xf2859C2af2b6CF5C6590e6Aed14e649bc524Cb76",
+    "0x691A738cb9Aa34CFBbD284A393D2F6DdE5c65617",
+    "0x114a924107E83e2351117201658d237Adc7e0De4",
+    "0x9eDcDb5F34D7dAd28a7A536651bE730C3ca521C",
+    "0x962e198Ed39C7F12AB48a6b28AA0a06EcB5896C6",
+    "0xF5F75d37Fba81439CD2465cC698752d7B1D90972",
+    "0xF445c1C96Db6CcfA1418E1B16EA2e1026d6192d",
+    "0x6a8425933707834fd9babB3F70556Aea49b0650"
+  ],
+  "transactions": []
+}
